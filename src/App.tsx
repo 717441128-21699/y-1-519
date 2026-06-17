@@ -4,6 +4,7 @@ import { NotificationToast } from './components/NotificationToast';
 import HomePage from './pages/HomePage';
 import ProposalPage from './pages/ProposalPage';
 import MarriagePage from './pages/MarriagePage';
+import WeddingIndexPage from './pages/WeddingIndexPage';
 import WeddingPreparePage from './pages/WeddingPreparePage';
 import WeddingLivePage from './pages/WeddingLivePage';
 import GuildHallPage from './pages/GuildHallPage';
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/proposal" element={<ProposalPage />} />
           <Route path="/marriage" element={<MarriagePage />} />
+          <Route path="/wedding" element={<WeddingIndexPage />} />
           <Route path="/wedding/prepare" element={<WeddingPreparePage />} />
           <Route path="/wedding/live/:id" element={<WeddingLivePage />} />
           <Route path="/guild/wedding-hall" element={<GuildHallPage />} />

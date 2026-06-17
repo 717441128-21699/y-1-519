@@ -8,6 +8,7 @@ interface GameState {
   items: Item[];
   marriage: Marriage | null;
   wedding: Wedding | null;
+  ongoingWeddings: Wedding[];
   guildHall: GuildWeddingHall | null;
   weeklyReport: { report: WeeklyReport; insights: unknown[] } | null;
   guilds: Guild[];
@@ -30,6 +31,7 @@ interface GameState {
   loadGuilds: () => Promise<void>;
   loadStyles: () => Promise<void>;
   loadRankings: (type: string) => Promise<void>;
+  loadOngoingWeddings: () => Promise<void>;
 
   submitProposal: (data: { proposerId: string; targetId: string; tokenItemId: string }) => Promise<ProposalResponse | null>;
   claimDailyLove: (marriageId: string) => Promise<boolean>;
@@ -52,6 +54,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   items: [],
   marriage: null,
   wedding: null,
+  ongoingWeddings: [],
   guildHall: null,
   weeklyReport: null,
   guilds: [],
@@ -207,6 +210,20 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({ error: error instanceof Error ? error.message : '加载失败' });
     } finally {
       set({ loading: { ...get().loading, [`ranking_${type}`]: false } });
+    }
+  },
+
+  loadOngoingWeddings: async () => {
+    try {
+      set({ loading: { ...get().loading, ongoingWeddings: true } });
+      const response = await weddingApi.getOngoing();
+      if (response.success) {
+        set({ ongoingWeddings: (response.data as Wedding[]) || [] });
+      }
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '加载进行中婚礼失败' });
+    } finally {
+      set({ loading: { ...get().loading, ongoingWeddings: false } });
     }
   },
 

@@ -3,18 +3,15 @@ import { getItemById, getIntimacy, getPlayerById, mockProposals, mockMarriages, 
 import { generateId } from '../mockData';
 
 export class ProposalService {
-  static calculateSuccessRate(intimacy: number, qualityBonus: number): number {
-    const intimacyFactor = Math.min(intimacy / 10, 50);
-    const baseRate = intimacyFactor + qualityBonus;
-    return Math.min(Math.max(baseRate, 5), 95);
-  }
+  static readonly BASE_RATE = 20;
 
   static calculateIntimacyFactor(intimacy: number): number {
     if (intimacy >= 800) return 45;
     if (intimacy >= 600) return 38;
     if (intimacy >= 400) return 30;
     if (intimacy >= 200) return 22;
-    return 15;
+    if (intimacy >= 100) return 15;
+    return 5;
   }
 
   static getQualityBonus(quality: Quality): number {
@@ -25,6 +22,11 @@ export class ProposalService {
       legendary: 50,
     };
     return bonuses[quality];
+  }
+
+  static computeBaseRate(intimacy: number, qualityBonus: number): number {
+    const intimacyFactor = this.calculateIntimacyFactor(intimacy);
+    return Math.min(Math.max(intimacyFactor + qualityBonus, 5), 95);
   }
 
   static triggerRandomEvent(): 'loveCalamity' | 'heavenlyBlessing' | null {
@@ -51,18 +53,23 @@ export class ProposalService {
     }
   }
 
-  static calculateProposalRate(request: ProposalRequest): { successRate: number; intimacy: number; qualityBonus: number; intimacyFactor: number } {
+  static calculateProposalRate(request: ProposalRequest): {
+    successRate: number;
+    intimacy: number;
+    qualityBonus: number;
+    intimacyFactor: number;
+    baseRate: number;
+  } {
     const intimacy = getIntimacy(request.proposerId, request.targetId);
     const item = getItemById(request.tokenItemId);
     if (!item) {
-      return { successRate: 0, intimacy, qualityBonus: 0, intimacyFactor: 0 };
+      return { successRate: 0, intimacy, qualityBonus: 0, intimacyFactor: 0, baseRate: 0 };
     }
     const qualityBonus = this.getQualityBonus(item.quality);
     const intimacyFactor = this.calculateIntimacyFactor(intimacy);
-    const baseRate = intimacyFactor + qualityBonus;
-    const successRate = this.calculateSuccessRate(intimacy, qualityBonus);
-    
-    return { successRate, intimacy, qualityBonus, intimacyFactor };
+    const baseRate = this.computeBaseRate(intimacy, qualityBonus);
+
+    return { successRate: baseRate, intimacy, qualityBonus, intimacyFactor, baseRate };
   }
 
   static submitProposal(request: ProposalRequest): ProposalResponse {

@@ -75,6 +75,162 @@ export class ReportService {
     const weddingLuxury = Math.min(Math.round((avgLuxuryScore / 500) * 100), 100);
     const guildContribution = Math.min(Math.round((totalGuildContribution / 10000) * 100), 100);
 
+    const styleLabels: Record<WeddingStyle, string> = {
+      fairyTale: '梦幻童话',
+      darkFantasy: '黑暗幻想',
+      xianxia: '仙侠情缘',
+      starryNight: '星空主题',
+      oceanDream: '海洋之梦',
+      forestWonder: '森林奇幻',
+    };
+
+    const summary: WeeklyReport['summary'] = {
+      totalProposals,
+      successRate,
+      totalWeddings: weekWeddings.length,
+      avgLuxuryScore,
+      totalGuildContribution,
+      totalGifts: weekWeddings.reduce((sum, w) => sum + (w.totalGift || w.totalGifts || 0), 0),
+    };
+
+    const report: WeeklyReport = {
+      weekStart: weekStart.toISOString().split('T')[0],
+      weekEnd: weekEnd.toISOString().split('T')[0],
+      weddingStyleHeatmap,
+      loveValueTrend,
+      transactionTrend,
+      radarData: {
+        proposalSuccess: successRate,
+        marriageHappiness,
+        weddingLuxury,
+        guildContribution,
+        activityLevel,
+      },
+      summary,
+      filter,
+    };
+
+    report.comparison = this.generateComparison(report, filter);
+
+    const labels: string[] = [];
+    if (guildId) {
+      const guild = mockGuilds.find(g => g.id === guildId);
+      labels.push(guild ? guild.name : guildId);
+    }
+    if (style) {
+      labels.push(styleLabels[style]);
+    }
+    if (labels.length) {
+      report.appliedFilterLabel = labels.join(' · ');
+    }
+
+    return report;
+  }
+
+  private static generateComparison(current: WeeklyReport, filter: ReportFilter): WeeklyReport['comparison'] {
+    const prevFilter: ReportFilter = { ...filter, weekOffset: (filter.weekOffset || 0) + 1 };
+    const prev = this.generateWithoutComparison(prevFilter);
+
+    const cs = current.summary;
+    const ps = prev.summary;
+
+    const safeDiv = (cur: number, prev: number) => (prev === 0 ? 0 : Math.round(((cur - prev) / prev) * 100));
+
+    return {
+      summary: {
+        totalProposalsChange: safeDiv(cs.totalProposals, ps.totalProposals),
+        successRateChange: safeDiv(cs.successRate, ps.successRate),
+        totalWeddingsChange: safeDiv(cs.totalWeddings, ps.totalWeddings),
+        avgLuxuryScoreChange: safeDiv(cs.avgLuxuryScore, ps.avgLuxuryScore),
+        totalGuildContributionChange: safeDiv(cs.totalGuildContribution, ps.totalGuildContribution),
+        totalGiftsChange: safeDiv(Number(cs.totalGifts || 0), Number(ps.totalGifts || 0)),
+      },
+      radarData: prev.radarData,
+      loveValueTrend: prev.loveValueTrend.map((p, i) => ({
+        date: current.loveValueTrend[i]?.date || p.date,
+        avg: p.avg,
+      })),
+      transactionTrend: prev.transactionTrend.map((p, i) => ({
+        date: current.transactionTrend[i]?.date || p.date,
+        amount: p.amount,
+      })),
+      previousWeekSummary: ps,
+    };
+  }
+
+  private static generateWithoutComparison(filter: ReportFilter = {}): WeeklyReport {
+    const { guildId, style, weekOffset = 0 } = filter;
+
+    const now = new Date();
+    const weeksOffsetMs = weekOffset * 7 * 24 * 60 * 60 * 1000;
+    const weekEnd = new Date(now.getTime() + weeksOffsetMs);
+    const weekStart = new Date(weekEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    let weekProposals = mockProposals.filter(p => {
+      const createdAt = new Date(p.createdAt);
+      return createdAt >= weekStart && createdAt <= weekEnd;
+    });
+    let weekWeddings = mockWeddings.filter(w => {
+      const createdAt = new Date(w.createdAt);
+      return createdAt >= weekStart && createdAt <= weekEnd;
+    });
+
+    if (guildId) {
+      const playerIdsInGuild = new Set(
+        mockPlayers.filter(p => p.guildId === guildId).map(p => p.id)
+      );
+      weekWeddings = weekWeddings.filter(w => {
+        const marriage = mockMarriages.find(m => m.id === w.marriageId);
+        if (!marriage) return false;
+        return playerIdsInGuild.has(marriage.player1Id) || playerIdsInGuild.has(marriage.player2Id);
+      });
+      weekProposals = weekProposals.filter(p => {
+        return playerIdsInGuild.has(p.proposerId) || playerIdsInGuild.has(p.targetId);
+      });
+    }
+
+    if (style) {
+      weekWeddings = weekWeddings.filter(w => w.style === style);
+    }
+
+    const weddingStyleHeatmap = this.getWeddingStyleHeatmap(weekWeddings);
+    const loveValueTrend = this.getLoveValueTrend(weekOffset, guildId);
+    const transactionTrend = this.getTransactionTrend(weekWeddings, weekOffset);
+
+    const totalProposals = weekProposals.length;
+    const successfulProposals = weekProposals.filter(p => p.success).length;
+    const successRate = totalProposals > 0 ? Math.round((successfulProposals / totalProposals) * 100) : 0;
+
+    const avgLuxuryScore = weekWeddings.length > 0
+      ? Math.round(weekWeddings.reduce((sum, w) => sum + w.luxuryScore, 0) / weekWeddings.length)
+      : 0;
+
+    let guildHalls = mockGuildHalls;
+    if (guildId) {
+      guildHalls = mockGuildHalls.filter(h => h.guildId === guildId);
+    }
+    const totalGuildContribution = guildHalls.reduce((sum, h) =>
+      sum + h.contributions.reduce((s, c) => s + c.amount, 0), 0
+    );
+
+    let marriages = mockMarriages;
+    if (guildId) {
+      const playerIdsInGuild = new Set(
+        mockPlayers.filter(p => p.guildId === guildId).map(p => p.id)
+      );
+      marriages = mockMarriages.filter(m =>
+        playerIdsInGuild.has(m.player1Id) || playerIdsInGuild.has(m.player2Id)
+      );
+    }
+
+    const avgLoveValue = marriages.length > 0
+      ? Math.round(marriages.reduce((sum, m) => sum + m.loveValue, 0) / marriages.length)
+      : 0;
+    const marriageHappiness = Math.min(Math.round((avgLoveValue / 2000) * 100), 100);
+    const activityLevel = Math.min(Math.round(((weekProposals.length + weekWeddings.length * 2) / 20) * 100), 100);
+    const weddingLuxury = Math.min(Math.round((avgLuxuryScore / 500) * 100), 100);
+    const guildContribution = Math.min(Math.round((totalGuildContribution / 10000) * 100), 100);
+
     return {
       weekStart: weekStart.toISOString().split('T')[0],
       weekEnd: weekEnd.toISOString().split('T')[0],
@@ -94,6 +250,7 @@ export class ReportService {
         totalWeddings: weekWeddings.length,
         avgLuxuryScore,
         totalGuildContribution,
+        totalGifts: weekWeddings.reduce((sum, w) => sum + (w.totalGift || w.totalGifts || 0), 0),
       },
     };
   }

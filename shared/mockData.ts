@@ -307,13 +307,19 @@ export const mockWeddings: Wedding[] = [
     ],
     luxuryScore: 185,
     startTime: '2026-06-18T20:00:00',
-    status: 'completed',
+    status: 'ongoing',
     guests: [
       { playerId: 'p1', player: mockPlayers[0], giftAmount: 500, message: '祝你们百年好合！', blessedAt: '2026-06-18T20:05:00' },
       { playerId: 'p3', player: mockPlayers[2], giftAmount: 300, message: '永结同心！', blessedAt: '2026-06-18T20:08:00' },
+      { playerId: 'p7', player: mockPlayers[6], giftAmount: 200, message: '愿你们的爱情如风暴般热烈！', blessedAt: '2026-06-18T20:15:00' },
     ],
+    guestCount: 3,
     blessingPoints: 1500,
     totalGift: 2800,
+    totalGifts: 2800,
+    miniGames: [
+      { id: 'mg3', gameType: 'redPacket', playerId: 'p1', playerName: '月影法师', playerAvatar: '🧙‍♂️', score: 42, reward: 60, timestamp: '2026-06-18T20:10:00' },
+    ],
     createdAt: '2026-06-10',
   },
 ];

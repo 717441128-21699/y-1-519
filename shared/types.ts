@@ -231,6 +231,21 @@ export interface DailyLoveRecord {
   createdAt: string;
 }
 
+export interface WeeklyReportComparison {
+  summary: {
+    totalProposalsChange: number;
+    successRateChange: number;
+    totalWeddingsChange: number;
+    avgLuxuryScoreChange: number;
+    totalGuildContributionChange: number;
+    totalGiftsChange: number;
+  };
+  radarData: WeeklyReport['radarData'];
+  loveValueTrend: { date: string; avg: number }[];
+  transactionTrend: { date: string; amount: number }[];
+  previousWeekSummary?: WeeklyReport['summary'];
+}
+
 export interface WeeklyReport {
   weekStart: string;
   weekEnd: string;
@@ -255,6 +270,9 @@ export interface WeeklyReport {
     totalGuildContribution: number;
     totalGifts?: string | number;
   };
+  comparison?: WeeklyReportComparison;
+  filter?: ReportFilter;
+  appliedFilterLabel?: string;
 }
 
 export interface RankingEntry {

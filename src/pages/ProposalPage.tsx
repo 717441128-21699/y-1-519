@@ -14,7 +14,7 @@ export default function ProposalPage() {
   const { currentPlayer, players, items, loadCurrentPlayer, loadPlayers, loadItems, submitProposal, loading } = useGameStore();
   const [selectedTarget, setSelectedTarget] = useState<Player | null>(null);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [successRate, setSuccessRate] = useState<number | null>(null);
+  const [baseRate, setBaseRate] = useState<number | null>(null);
   const [intimacy, setIntimacy] = useState<number>(0);
   const [qualityBonus, setQualityBonus] = useState<number>(0);
   const [intimacyFactor, setIntimacyFactor] = useState<number>(0);
@@ -41,7 +41,7 @@ export default function ProposalPage() {
     if (selectedTarget && selectedItem && currentPlayer) {
       calculateSuccessRate();
     } else {
-      setSuccessRate(null);
+      setBaseRate(null);
       setIntimacy(0);
       setQualityBonus(0);
       setIntimacyFactor(0);
@@ -58,8 +58,14 @@ export default function ProposalPage() {
         tokenItemId: selectedItem.id,
       });
       if (response.success) {
-        const data = response.data as { successRate: number; intimacy: number; qualityBonus: number; intimacyFactor: number };
-        setSuccessRate(data.successRate);
+        const data = response.data as {
+          successRate: number;
+          intimacy: number;
+          qualityBonus: number;
+          intimacyFactor: number;
+          baseRate: number;
+        };
+        setBaseRate(data.baseRate);
         setIntimacy(data.intimacy);
         setQualityBonus(data.qualityBonus);
         setIntimacyFactor(data.intimacyFactor);
@@ -169,64 +175,89 @@ export default function ProposalPage() {
                     <p className="text-sm text-gray-400 mb-2">亲密度</p>
                     <ProgressBar
                       value={intimacy}
-                      max={100}
+                      max={1000}
                       color="pink"
                       label={selectedTarget ? `与 ${selectedTarget.name}` : ''}
                     />
+                    <p className="text-xs text-gray-500 mt-1 text-right">{intimacy} / 1000</p>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-magic-darker/50 rounded-lg">
                     <span className="text-sm text-gray-400">亲密度加成</span>
-                    <span className="text-lg font-bold text-magic-pink">
-                      {intimacyFactor > 0 ? `+${intimacyFactor}%` : '--'}
-                    </span>
+                    <div className="text-right">
+                      <span className="text-lg font-bold text-magic-pink">
+                        {intimacyFactor > 0 ? `+${intimacyFactor}%` : '--'}
+                      </span>
+                      <p className="text-xs text-gray-500">
+                        {intimacy >= 800 ? '心心相印' :
+                         intimacy >= 600 ? '情深意浓' :
+                         intimacy >= 400 ? '情意绵绵' :
+                         intimacy >= 200 ? '渐入佳境' :
+                         intimacy >= 100 ? '初识好感' : '萍水相逢'}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="text-center">
-                    <p className="text-sm text-gray-400 mb-2">道具品质加成</p>
+                  <div className="text-center p-3 bg-magic-darker/50 rounded-lg">
+                    <p className="text-sm text-gray-400 mb-2">信物品质加成</p>
                     <div className="text-3xl font-bold text-magic-gold">
                       {qualityBonus > 0 ? `+${qualityBonus}%` : '--'}
                     </div>
                     {selectedItem && (
-                      <p className="text-sm text-gray-400">{selectedItem.name}</p>
+                      <>
+                        <p className="text-sm text-gray-400">{selectedItem.name}</p>
+                        <p className="text-xs text-gray-500 uppercase">{selectedItem.quality}</p>
+                      </>
                     )}
                   </div>
-                  <div className="flex justify-between items-center p-3 bg-magic-darker/50 rounded-lg">
-                    <span className="text-sm text-gray-400">基础成功率</span>
+                  <div className="flex justify-between items-center p-3 bg-magic-gradient/30 border border-magic-purple/30 rounded-lg">
+                    <span className="text-sm text-gray-300 font-semibold">基础成功率</span>
                     <span className={`text-lg font-bold ${
-                      successRate === null
+                      baseRate === null
                         ? 'text-gray-500'
-                        : successRate >= 70
+                        : baseRate >= 70
                         ? 'text-green-400'
-                        : successRate >= 40
+                        : baseRate >= 40
                         ? 'text-yellow-400'
                         : 'text-red-400'
                     }`}>
-                      {successRate !== null ? `${successRate}%` : '--'}
+                      {baseRate !== null ? `${baseRate}%` : '--'}
                     </span>
+                  </div>
+                  <div className="text-center text-xs text-gray-500 px-2">
+                    {baseRate !== null ? (
+                      <p>
+                        <span className="text-magic-pink">+{intimacyFactor}%</span>
+                        {' '}+{' '}
+                        <span className="text-magic-gold">+{qualityBonus}%</span>
+                        {' '}= <span className="text-white font-semibold">{baseRate}%</span>
+                      </p>
+                    ) : (
+                      <p>亲密度加成 + 信物品质加成 = 基础成功率</p>
+                    )}
                   </div>
                 </div>
               </div>
 
               <div className="mt-6 flex justify-center">
                 <motion.div
-                  key={successRate}
+                  key={baseRate}
                   initial={{ scale: 0.5, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   className="text-center"
                 >
-                  <p className="text-sm text-gray-400 mb-1">预计成功率</p>
+                  <p className="text-sm text-gray-400 mb-1">预计成功率（不含随机事件）</p>
                   <div className={`text-5xl font-bold ${
-                    successRate === null
+                    baseRate === null
                       ? 'text-gray-500'
-                      : successRate >= 70
+                      : baseRate >= 70
                       ? 'text-green-400'
-                      : successRate >= 40
+                      : baseRate >= 40
                       ? 'text-yellow-400'
                       : 'text-red-400'
                   }`}>
-                    {successRate !== null ? `${successRate}%` : '--'}
+                    {baseRate !== null ? `${baseRate}%` : '--'}
                   </div>
                 </motion.div>
               </div>

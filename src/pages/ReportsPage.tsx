@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart3, Download, Calendar, TrendingUp, Heart, Sparkles, FileText, Coins, Filter } from 'lucide-react';
+import { BarChart3, Download, Calendar, TrendingUp, TrendingDown, Heart, Sparkles, FileText, Coins, Filter } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import { MagicCard } from '../components/MagicCard';
 import { MagicButton } from '../components/MagicButton';
@@ -67,6 +67,20 @@ export default function ReportsPage() {
     totalGuildContribution: number;
     totalGifts: string | number;
   };
+  const comparison = (weeklyReport?.report?.comparison || {}) as {
+    summary?: {
+      totalProposalsChange: number;
+      successRateChange: number;
+      totalWeddingsChange: number;
+      avgLuxuryScoreChange: number;
+      totalGuildContributionChange: number;
+      totalGiftsChange: number;
+    };
+    radarData?: any;
+    loveValueTrend?: { date: string; avg: number }[];
+    transactionTrend?: { date: string; amount: number }[];
+    previousWeekSummary?: any;
+  };
 
   const styleNames: Record<string, { name: string; icon: string }> = {
     fairyTale: { name: '梦幻童话', icon: '🏰' },
@@ -107,6 +121,7 @@ export default function ReportsPage() {
 
   const trendChartOption: EChartsOption = {
     tooltip: { trigger: 'axis' },
+    legend: { data: ['本周', '上周'], textStyle: { color: '#9CA3AF' }, top: 0 },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
     xAxis: {
       type: 'category',
@@ -114,27 +129,38 @@ export default function ReportsPage() {
       axisLabel: { color: '#9CA3AF' }
     },
     yAxis: { type: 'value', axisLabel: { color: '#9CA3AF' } },
-    series: [{
-      type: 'line',
-      data: loveTrendData.map(d => d.avg),
-      smooth: true,
-      areaStyle: {
-        color: {
-          type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-          colorStops: [
-            { offset: 0, color: 'rgba(236, 72, 153, 0.3)' },
-            { offset: 1, color: 'rgba(107, 70, 193, 0.05)' },
-          ],
+    series: [
+      {
+        name: '本周',
+        type: 'line',
+        data: loveTrendData.map(d => d.avg),
+        smooth: true,
+        areaStyle: {
+          color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(236, 72, 153, 0.3)' },
+              { offset: 1, color: 'rgba(107, 70, 193, 0.05)' },
+            ],
+          },
         },
+        lineStyle: { color: '#EC4899', width: 3 },
+        itemStyle: { color: '#F59E0B' },
       },
-      lineStyle: { color: '#EC4899', width: 3 },
-      itemStyle: { color: '#F59E0B' },
-    }],
+      ...(comparison.loveValueTrend?.length ? [{
+        name: '上周',
+        type: 'line' as const,
+        data: comparison.loveValueTrend.map((d: any) => d.avg),
+        smooth: true,
+        lineStyle: { color: '#94A3B8', width: 2, type: 'dashed' as const },
+        itemStyle: { color: '#94A3B8' },
+      }] : []),
+    ],
     backgroundColor: 'transparent',
   };
 
   const radarChartOption: EChartsOption = {
     tooltip: {},
+    legend: { data: ['本周', '上周'], textStyle: { color: '#9CA3AF' }, top: 0 },
     radar: {
       indicator: [
         { name: '求婚成功率', max: 100 },
@@ -150,26 +176,43 @@ export default function ReportsPage() {
     },
     series: [{
       type: 'radar',
-      data: [{
-      value: [
-          radarData.proposalSuccess || 75,
-          radarData.marriageHappiness || 80,
-          radarData.weddingLuxury || 70,
-          radarData.loveIndex || 85,
-          radarData.guildActivity || 65,
-          radarData.sweetness || 90,
-        ],
-        name: '本周数据',
-        areaStyle: { color: 'rgba(236, 72, 153, 0.3)' },
-        lineStyle: { color: '#EC4899' },
-        itemStyle: { color: '#F59E0B' },
-      }],
+      data: [
+        {
+          value: [
+            radarData.proposalSuccess || 75,
+            radarData.marriageHappiness || 80,
+            radarData.weddingLuxury || 70,
+            radarData.loveIndex || 85,
+            radarData.guildActivity || 65,
+            radarData.sweetness || 90,
+          ],
+          name: '本周',
+          areaStyle: { color: 'rgba(236, 72, 153, 0.3)' },
+          lineStyle: { color: '#EC4899' },
+          itemStyle: { color: '#F59E0B' },
+        },
+        ...(comparison.radarData ? [{
+          value: [
+            comparison.radarData.proposalSuccess ?? 60,
+            comparison.radarData.marriageHappiness ?? 65,
+            comparison.radarData.weddingLuxury ?? 55,
+            comparison.radarData.loveIndex ?? 70,
+            comparison.radarData.guildActivity ?? 50,
+            comparison.radarData.sweetness ?? 75,
+          ],
+          name: '上周',
+          areaStyle: { color: 'rgba(148, 163, 184, 0.15)' },
+          lineStyle: { color: '#94A3B8', type: 'dashed' as const },
+          itemStyle: { color: '#94A3B8' },
+        }] : []),
+      ],
     }],
     backgroundColor: 'transparent',
   };
 
   const transactionChartOption: EChartsOption = {
     tooltip: { trigger: 'axis' },
+    legend: { data: ['本周', '上周'], textStyle: { color: '#9CA3AF' }, top: 0 },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
     xAxis: {
       type: 'category',
@@ -177,23 +220,48 @@ export default function ReportsPage() {
       axisLabel: { color: '#9CA3AF' }
     },
     yAxis: { type: 'value', axisLabel: { color: '#9CA3AF' } },
-    series: [{
-      type: 'line',
-      data: transactionTrendData.map(d => d.amount),
-      smooth: true,
-      areaStyle: {
-        color: {
-          type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-          colorStops: [
-            { offset: 0, color: 'rgba(245, 158, 11, 0.3)' },
-            { offset: 1, color: 'rgba(107, 70, 193, 0.05)' },
-          ],
+    series: [
+      {
+        name: '本周',
+        type: 'line',
+        data: transactionTrendData.map(d => d.amount),
+        smooth: true,
+        areaStyle: {
+          color: {
+            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(245, 158, 11, 0.3)' },
+              { offset: 1, color: 'rgba(107, 70, 193, 0.05)' },
+            ],
+          },
         },
+        lineStyle: { color: '#F59E0B', width: 3 },
+        itemStyle: { color: '#EC4899' },
       },
-      lineStyle: { color: '#F59E0B', width: 3 },
-      itemStyle: { color: '#EC4899' },
-    }],
+      ...(comparison.transactionTrend?.length ? [{
+        name: '上周',
+        type: 'line' as const,
+        data: comparison.transactionTrend.map((d: any) => d.amount),
+        smooth: true,
+        lineStyle: { color: '#94A3B8', width: 2, type: 'dashed' as const },
+        itemStyle: { color: '#94A3B8' },
+      }] : []),
+    ],
     backgroundColor: 'transparent',
+  };
+
+  const ChangeBadge = ({ value, invert }: { value?: number; invert?: boolean }) => {
+    if (value === undefined) return null;
+    const positive = value >= 0;
+    const showPositive = invert ? !positive : positive;
+    return (
+      <span className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full ml-1 ${
+        showPositive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+      }`}>
+        {positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+        {positive ? '+' : ''}{value}%
+      </span>
+    );
   };
 
   return (
@@ -212,6 +280,9 @@ export default function ReportsPage() {
               <Calendar className="w-4 h-4" />
               {weeklyReport?.report?.weekStart || '2024-01-01'} ~ {weeklyReport?.report?.weekEnd || '2024-01-07'}
             </p>
+            {weeklyReport?.report?.appliedFilterLabel && (
+              <p className="text-xs text-gray-500 mt-1">{weeklyReport.report.appliedFilterLabel}</p>
+            )}
           </motion.div>
           
           <MagicButton onClick={handleExportPDF} loading={exporting}>
@@ -271,23 +342,23 @@ export default function ReportsPage() {
           <div className="grid md:grid-cols-4 gap-4 mb-8">
             <MagicCard hover={false} className="text-center p-6">
               <div className="text-3xl mb-2">💍</div>
-              <p className="text-3xl font-bold text-magic-purple">{summary.totalProposals || 156}</p>
+              <p className="text-3xl font-bold text-magic-purple">{summary.totalProposals || 156}<ChangeBadge value={comparison.summary?.totalProposalsChange} /></p>
               <p className="text-sm text-gray-400">求婚总数</p>
             </MagicCard>
             <MagicCard hover={false} className="text-center p-6">
               <div className="text-3xl mb-2">💖</div>
-              <p className="text-3xl font-bold text-magic-pink">{summary.successRate || 78}%</p>
+              <p className="text-3xl font-bold text-magic-pink">{summary.successRate || 78}%<ChangeBadge value={comparison.summary?.successRateChange} /></p>
               <p className="text-sm text-gray-400">成功率</p>
             </MagicCard>
             <MagicCard hover={false} className="text-center p-6">
               <div className="text-3xl mb-2">💒</div>
-              <p className="text-3xl font-bold text-magic-gold">{summary.totalWeddings || 89}</p>
+              <p className="text-3xl font-bold text-magic-gold">{summary.totalWeddings || 89}<ChangeBadge value={comparison.summary?.totalWeddingsChange} /></p>
               <p className="text-sm text-gray-400">婚礼数</p>
             </MagicCard>
             <MagicCard hover={false} className="text-center p-6">
               <div className="text-3xl mb-2">💰</div>
               <p className="text-3xl font-bold text-magic-green">{summary.totalGifts || '12.5K'}</p>
-              <p className="text-sm text-gray-400">礼金总额</p>
+              <p className="text-sm text-gray-400">礼金总额<ChangeBadge value={comparison.summary?.totalGiftsChange} /></p>
             </MagicCard>
           </div>
 

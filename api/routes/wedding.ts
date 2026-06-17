@@ -81,6 +81,21 @@ router.post('/prepare', (req: Request, res: Response) => {
   }
 });
 
+router.get('/ongoing', (_req: Request, res: Response) => {
+  try {
+    const weddings = WeddingService.getOngoingWeddings();
+    res.json({
+      success: true,
+      data: weddings,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error instanceof Error ? error.message : '获取进行中婚礼失败',
+    });
+  }
+});
+
 router.get('/:weddingId', (req: Request, res: Response) => {
   try {
     const { weddingId } = req.params;
@@ -223,21 +238,6 @@ router.get('/marriage/:marriageId', (req: Request, res: Response) => {
     res.status(400).json({
       success: false,
       message: error instanceof Error ? error.message : '获取婚礼列表失败',
-    });
-  }
-});
-
-router.get('/ongoing', (_req: Request, res: Response) => {
-  try {
-    const weddings = WeddingService.getOngoingWeddings();
-    res.json({
-      success: true,
-      data: weddings,
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: error instanceof Error ? error.message : '获取进行中婚礼失败',
     });
   }
 });
