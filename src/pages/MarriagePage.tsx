@@ -20,8 +20,12 @@ const loveLevels = [
 ];
 
 export default function MarriagePage() {
-  const { currentPlayer, marriage, loadMarriage, claimDailyLove, enterDungeon, loading } = useGameStore();
+  const { currentPlayer, marriage, loadCurrentPlayer, loadMarriage, claimDailyLove, enterDungeon, loading } = useGameStore();
   const [loveLevel, setLoveLevel] = useState(loveLevels[0]);
+
+  useEffect(() => {
+    loadCurrentPlayer();
+  }, [loadCurrentPlayer]);
 
   useEffect(() => {
     if (currentPlayer) {

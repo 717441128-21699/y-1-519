@@ -1,21 +1,45 @@
-import type { WeeklyReport, WeddingStyle } from '../types';
-import { mockWeddings, mockMarriages, mockProposals, mockGuildHalls } from '../mockData';
+import type { WeeklyReport, WeddingStyle, ReportFilter, Guild } from '../types';
+import { mockWeddings, mockMarriages, mockProposals, mockGuildHalls, mockGuilds, mockPlayers } from '../mockData';
 
 export class ReportService {
-  static generateWeeklyReport(): WeeklyReport {
+  static generateWeeklyReport(filter: ReportFilter = {}): WeeklyReport {
+    const { guildId, style, weekOffset = 0 } = filter;
+
     const now = new Date();
-    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    
-    const weekProposals = mockProposals.filter(p => 
-      new Date(p.createdAt) >= weekStart
-    );
-    const weekWeddings = mockWeddings.filter(w => 
-      new Date(w.createdAt) >= weekStart
-    );
+    const weeksOffsetMs = weekOffset * 7 * 24 * 60 * 60 * 1000;
+    const weekEnd = new Date(now.getTime() + weeksOffsetMs);
+    const weekStart = new Date(weekEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    let weekProposals = mockProposals.filter(p => {
+      const createdAt = new Date(p.createdAt);
+      return createdAt >= weekStart && createdAt <= weekEnd;
+    });
+    let weekWeddings = mockWeddings.filter(w => {
+      const createdAt = new Date(w.createdAt);
+      return createdAt >= weekStart && createdAt <= weekEnd;
+    });
+
+    if (guildId) {
+      const playerIdsInGuild = new Set(
+        mockPlayers.filter(p => p.guildId === guildId).map(p => p.id)
+      );
+      weekWeddings = weekWeddings.filter(w => {
+        const marriage = mockMarriages.find(m => m.id === w.marriageId);
+        if (!marriage) return false;
+        return playerIdsInGuild.has(marriage.player1Id) || playerIdsInGuild.has(marriage.player2Id);
+      });
+      weekProposals = weekProposals.filter(p => {
+        return playerIdsInGuild.has(p.proposerId) || playerIdsInGuild.has(p.targetId);
+      });
+    }
+
+    if (style) {
+      weekWeddings = weekWeddings.filter(w => w.style === style);
+    }
 
     const weddingStyleHeatmap = this.getWeddingStyleHeatmap(weekWeddings);
-    const loveValueTrend = this.getLoveValueTrend();
-    const transactionTrend = this.getTransactionTrend(weekWeddings);
+    const loveValueTrend = this.getLoveValueTrend(weekOffset, guildId);
+    const transactionTrend = this.getTransactionTrend(weekWeddings, weekOffset);
     
     const totalProposals = weekProposals.length;
     const successfulProposals = weekProposals.filter(p => p.success).length;
@@ -25,12 +49,26 @@ export class ReportService {
       ? Math.round(weekWeddings.reduce((sum, w) => sum + w.luxuryScore, 0) / weekWeddings.length)
       : 0;
     
-    const totalGuildContribution = mockGuildHalls.reduce((sum, h) => 
+    let guildHalls = mockGuildHalls;
+    if (guildId) {
+      guildHalls = mockGuildHalls.filter(h => h.guildId === guildId);
+    }
+    const totalGuildContribution = guildHalls.reduce((sum, h) => 
       sum + h.contributions.reduce((s, c) => s + c.amount, 0), 0
     );
 
-    const avgLoveValue = mockMarriages.length > 0
-      ? Math.round(mockMarriages.reduce((sum, m) => sum + m.loveValue, 0) / mockMarriages.length)
+    let marriages = mockMarriages;
+    if (guildId) {
+      const playerIdsInGuild = new Set(
+        mockPlayers.filter(p => p.guildId === guildId).map(p => p.id)
+      );
+      marriages = mockMarriages.filter(m => 
+        playerIdsInGuild.has(m.player1Id) || playerIdsInGuild.has(m.player2Id)
+      );
+    }
+
+    const avgLoveValue = marriages.length > 0
+      ? Math.round(marriages.reduce((sum, m) => sum + m.loveValue, 0) / marriages.length)
       : 0;
     const marriageHappiness = Math.min(Math.round((avgLoveValue / 2000) * 100), 100);
     const activityLevel = Math.min(Math.round(((weekProposals.length + weekWeddings.length * 2) / 20) * 100), 100);
@@ -39,7 +77,7 @@ export class ReportService {
 
     return {
       weekStart: weekStart.toISOString().split('T')[0],
-      weekEnd: now.toISOString().split('T')[0],
+      weekEnd: weekEnd.toISOString().split('T')[0],
       weddingStyleHeatmap,
       loveValueTrend,
       transactionTrend,
@@ -60,6 +98,14 @@ export class ReportService {
     };
   }
 
+  static getAllGuilds(): Guild[] {
+    return mockGuilds;
+  }
+
+  static getAllStyles(): WeddingStyle[] {
+    return ['fairyTale', 'darkFantasy', 'xianxia', 'starryNight', 'oceanDream', 'forestWonder'];
+  }
+
   static getWeddingStyleHeatmap(weddings: typeof mockWeddings): Record<WeddingStyle, number> {
     const heatmap: Record<string, number> = {
       fairyTale: 0,
@@ -77,29 +123,46 @@ export class ReportService {
     return heatmap as Record<WeddingStyle, number>;
   }
 
-  static getLoveValueTrend(): { date: string; avg: number }[] {
+  static getLoveValueTrend(weekOffset: number = 0, guildId?: string): { date: string; avg: number }[] {
     const trend: { date: string; avg: number }[] = [];
     const now = new Date();
+    const weeksOffsetMs = weekOffset * 7 * 24 * 60 * 60 * 1000;
+    const baseDate = new Date(now.getTime() + weeksOffsetMs);
+
+    let marriages = mockMarriages;
+    if (guildId) {
+      const playerIdsInGuild = new Set(
+        mockPlayers.filter(p => p.guildId === guildId).map(p => p.id)
+      );
+      marriages = mockMarriages.filter(m => 
+        playerIdsInGuild.has(m.player1Id) || playerIdsInGuild.has(m.player2Id)
+      );
+    }
 
     for (let i = 6; i >= 0; i--) {
-      const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const date = new Date(baseDate.getTime() - i * 24 * 60 * 60 * 1000);
       const dateStr = date.toISOString().split('T')[0];
-      const baseAvg = 1200 + Math.sin(i * 0.5) * 200 + Math.random() * 100;
+      const baseAvg = marriages.length > 0
+        ? Math.round(marriages.reduce((sum, m) => sum + m.loveValue, 0) / marriages.length)
+        : 1200;
+      const variance = Math.sin(i * 0.5 + weekOffset) * 200 + Math.random() * 100;
       trend.push({
         date: dateStr,
-        avg: Math.round(baseAvg),
+        avg: Math.round(baseAvg + variance),
       });
     }
 
     return trend;
   }
 
-  static getTransactionTrend(weddings: typeof mockWeddings): { date: string; amount: number }[] {
+  static getTransactionTrend(weddings: typeof mockWeddings, weekOffset: number = 0): { date: string; amount: number }[] {
     const trend: { date: string; amount: number }[] = [];
     const now = new Date();
+    const weeksOffsetMs = weekOffset * 7 * 24 * 60 * 60 * 1000;
+    const baseDate = new Date(now.getTime() + weeksOffsetMs);
 
     for (let i = 6; i >= 0; i--) {
-      const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const date = new Date(baseDate.getTime() - i * 24 * 60 * 60 * 1000);
       const dateStr = date.toISOString().split('T')[0];
       
       const dayWeddings = weddings.filter(w => 
@@ -107,7 +170,7 @@ export class ReportService {
       );
       
       const dayAmount = dayWeddings.reduce((sum, w) => sum + w.totalGift, 0);
-      const baseAmount = 5000 + Math.random() * 3000;
+      const baseAmount = 5000 + Math.random() * 3000 + weekOffset * 500;
       
       trend.push({
         date: dateStr,

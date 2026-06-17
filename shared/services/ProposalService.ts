@@ -51,18 +51,18 @@ export class ProposalService {
     }
   }
 
-  static calculateProposalRate(request: ProposalRequest): { successRate: number; intimacy: number; qualityBonus: number } {
+  static calculateProposalRate(request: ProposalRequest): { successRate: number; intimacy: number; qualityBonus: number; intimacyFactor: number } {
     const intimacy = getIntimacy(request.proposerId, request.targetId);
     const item = getItemById(request.tokenItemId);
     if (!item) {
-      return { successRate: 0, intimacy, qualityBonus: 0 };
+      return { successRate: 0, intimacy, qualityBonus: 0, intimacyFactor: 0 };
     }
     const qualityBonus = this.getQualityBonus(item.quality);
     const intimacyFactor = this.calculateIntimacyFactor(intimacy);
     const baseRate = intimacyFactor + qualityBonus;
     const successRate = this.calculateSuccessRate(intimacy, qualityBonus);
     
-    return { successRate, intimacy, qualityBonus };
+    return { successRate, intimacy, qualityBonus, intimacyFactor };
   }
 
   static submitProposal(request: ProposalRequest): ProposalResponse {
@@ -76,6 +76,10 @@ export class ProposalService {
         successRate: 0,
         event: null,
         message: '求婚失败：无效的玩家或道具！',
+        baseRate: 0,
+        eventBonus: 0,
+        finalRate: 0,
+        rollResult: 0,
       };
     }
 
@@ -85,6 +89,10 @@ export class ProposalService {
         successRate: 0,
         event: null,
         message: '求婚失败：双方等级需达到30级！',
+        baseRate: 0,
+        eventBonus: 0,
+        finalRate: 0,
+        rollResult: 0,
       };
     }
 
@@ -101,15 +109,24 @@ export class ProposalService {
         successRate: 0,
         event: null,
         message: '求婚失败：其中一方已有婚姻关系！',
+        baseRate: 0,
+        eventBonus: 0,
+        finalRate: 0,
+        rollResult: 0,
       };
     }
 
     const { successRate: baseRate, intimacy } = this.calculateProposalRate(request);
     const event = this.triggerRandomEvent();
-    const { finalRate, message: eventMessage } = this.applyEventEffect(baseRate, event);
+    const { finalRate, message: eventEffectMessage } = this.applyEventEffect(baseRate, event);
 
-    const roll = Math.random() * 100;
-    const success = roll < finalRate;
+    let eventBonus = 0;
+    if (event === 'heavenlyBlessing') eventBonus = 25;
+    else if (event === 'loveCalamity') eventBonus = -20;
+
+    const roll = Math.random();
+    const rollResult = Math.round(roll * 100);
+    const success = rollResult < finalRate;
 
     let finalMessage = '';
     if (success) {
@@ -176,8 +193,13 @@ export class ProposalService {
       success,
       successRate: finalRate,
       event,
-      message: eventMessage ? `${eventMessage}\n${finalMessage}` : finalMessage,
+      message: eventEffectMessage ? `${eventEffectMessage}\n${finalMessage}` : finalMessage,
       proposalId: proposal.id,
+      baseRate,
+      eventBonus,
+      finalRate,
+      rollResult,
+      eventEffectMessage: eventEffectMessage || undefined,
     };
   }
 

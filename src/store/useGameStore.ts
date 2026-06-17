@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Player, Item, Marriage, Wedding, GuildWeddingHall, WeeklyReport, RankingEntry, BlessingMessage, ProposalResponse } from '../../shared/types';
+import type { Player, Item, Marriage, Wedding, GuildWeddingHall, WeeklyReport, RankingEntry, BlessingMessage, ProposalResponse, Guild, WeddingStyle, MiniGameResult } from '../../shared/types';
 import { dataApi, marriageApi, weddingApi, guildApi, reportsApi, rankingsApi, proposalApi } from '../utils/apiClient';
 
 interface GameState {
@@ -10,6 +10,8 @@ interface GameState {
   wedding: Wedding | null;
   guildHall: GuildWeddingHall | null;
   weeklyReport: { report: WeeklyReport; insights: unknown[] } | null;
+  guilds: Guild[];
+  styles: WeddingStyle[];
   rankings: Record<string, RankingEntry[]>;
   blessingMessages: BlessingMessage[];
   blessing: number;
@@ -24,16 +26,20 @@ interface GameState {
   loadMarriage: (playerId: string) => Promise<void>;
   loadWedding: (weddingId: string) => Promise<void>;
   loadGuildHall: (playerId: string) => Promise<void>;
-  loadWeeklyReport: () => Promise<void>;
+  loadWeeklyReport: (params?: { guildId?: string; style?: string; weekOffset?: number }) => Promise<void>;
+  loadGuilds: () => Promise<void>;
+  loadStyles: () => Promise<void>;
   loadRankings: (type: string) => Promise<void>;
 
   submitProposal: (data: { proposerId: string; targetId: string; tokenItemId: string }) => Promise<ProposalResponse | null>;
   claimDailyLove: (marriageId: string) => Promise<boolean>;
   enterDungeon: (marriageId: string) => Promise<boolean>;
   contributeGuild: (playerId: string, amount: number) => Promise<boolean>;
-  approveUpgrade: (playerId: string, approve: boolean) => Promise<boolean>;
+  approveUpgrade: (playerId: string, approve: boolean, rejectReason?: string) => Promise<boolean>;
   sendBlessing: (weddingId: string, playerId: string, message: string, giftAmount: number) => Promise<boolean>;
   addBlessingMessage: (message: BlessingMessage) => void;
+  loadBlessingMessages: (weddingId: string) => Promise<void>;
+  playMiniGame: (weddingId: string, playerId: string, gameType: string) => Promise<MiniGameResult | null>;
 
   addNotification: (type: string, message: string) => void;
   removeNotification: (id: string) => void;
@@ -48,6 +54,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   wedding: null,
   guildHall: null,
   weeklyReport: null,
+  guilds: [],
+  styles: [],
   rankings: {},
   blessingMessages: [],
   blessing: 0,
@@ -141,10 +149,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  loadWeeklyReport: async () => {
+  loadWeeklyReport: async (params) => {
     try {
       set({ loading: { ...get().loading, weeklyReport: true } });
-      const response = await reportsApi.getWeekly();
+      const response = await reportsApi.getWeekly(params);
       if (response.success) {
         set({ weeklyReport: response.data as { report: WeeklyReport; insights: unknown[] } });
       }
@@ -152,6 +160,34 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({ error: error instanceof Error ? error.message : '加载失败' });
     } finally {
       set({ loading: { ...get().loading, weeklyReport: false } });
+    }
+  },
+
+  loadGuilds: async () => {
+    try {
+      set({ loading: { ...get().loading, guilds: true } });
+      const response = await reportsApi.getGuilds();
+      if (response.success) {
+        set({ guilds: response.data as Guild[] });
+      }
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '加载失败' });
+    } finally {
+      set({ loading: { ...get().loading, guilds: false } });
+    }
+  },
+
+  loadStyles: async () => {
+    try {
+      set({ loading: { ...get().loading, styles: true } });
+      const response = await reportsApi.getStyles();
+      if (response.success) {
+        set({ styles: response.data as WeddingStyle[] });
+      }
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '加载失败' });
+    } finally {
+      set({ loading: { ...get().loading, styles: false } });
     }
   },
 
@@ -263,12 +299,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  approveUpgrade: async (playerId: string, approve: boolean) => {
+  approveUpgrade: async (playerId: string, approve: boolean, rejectReason?: string) => {
     try {
-      const response = await guildApi.approveUpgrade({ playerId, approve });
+      const response = await guildApi.approveUpgrade({ playerId, approve, rejectReason });
       if (response.success) {
         const result = response.data as { success: boolean; message: string; hall?: GuildWeddingHall };
-        get().addNotification('info', result.message);
+        get().addNotification(result.success ? 'info' : 'error', result.message);
         if (result.hall) {
           set({ guildHall: result.hall });
         }
@@ -304,6 +340,37 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       blessingMessages: [...get().blessingMessages, message].slice(-50),
     });
+  },
+
+  loadBlessingMessages: async (weddingId: string) => {
+    try {
+      const response = await weddingApi.getBlessings(weddingId);
+      if (response.success) {
+        set({ blessingMessages: (response.data as BlessingMessage[]).slice(-50) });
+      }
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '加载祝福消息失败' });
+    }
+  },
+
+  playMiniGame: async (weddingId: string, playerId: string, gameType: string) => {
+    try {
+      set({ loading: { ...get().loading, miniGame: true } });
+      const response = await weddingApi.playMiniGame(weddingId, { playerId, gameType });
+      if (response.success) {
+        const result = response.data as { success: boolean; result?: MiniGameResult; message: string };
+        get().addNotification(result.success ? 'success' : 'error', result.message);
+        if (result.success && result.result) {
+          return result.result;
+        }
+      }
+      return null;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '玩小游戏失败' });
+      return null;
+    } finally {
+      set({ loading: { ...get().loading, miniGame: false } });
+    }
   },
 
   addNotification: (type, message) => {

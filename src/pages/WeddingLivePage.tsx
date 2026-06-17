@@ -1,37 +1,42 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MessageCircle, Coins, Users, Sparkles, Send, Crown, Music } from 'lucide-react';
+import { Heart, MessageCircle, Coins, Users, Sparkles, Send, Crown, Music, Gift, Dice1 } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import { MagicCard } from '../components/MagicCard';
 import { MagicButton } from '../components/MagicButton';
 import { PlayerAvatar } from '../components/PlayerAvatar';
-import type { BlessingMessage } from '../../shared/types';
+import type { BlessingMessage, Guest } from '../../shared/types';
 
 export default function WeddingLivePage() {
   const { id } = useParams<{ id: string }>();
-  const { currentPlayer, wedding, blessingMessages, loadWedding, sendBlessing, addBlessingMessage, blessing } = useGameStore();
+  const { currentPlayer, wedding, blessingMessages, loadCurrentPlayer, loadWedding, sendBlessing, addBlessingMessage, loadBlessingMessages, playMiniGame } = useGameStore();
   const [message, setMessage] = useState('');
   const [giftAmount, setGiftAmount] = useState(100);
-  const [blessingPoints, setBlessingPoints] = useState(0);
-  const [interactions, setInteractions] = useState(0);
-  const [totalGifts, setTotalGifts] = useState(0);
   const [weddingPhase, setWeddingPhase] = useState<'ceremony' | 'vows' | 'rings' | 'kiss' | 'celebration'>('ceremony');
   const [showFireworks, setShowFireworks] = useState(false);
+  const [gamePlaying, setGamePlaying] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    loadCurrentPlayer();
+  }, [loadCurrentPlayer]);
 
   useEffect(() => {
     if (id) {
       loadWedding(id);
+      loadBlessingMessages(id);
     }
-  }, [loadWedding, id]);
+  }, [loadWedding, loadBlessingMessages, id]);
 
   useEffect(() => {
-    if (wedding) {
-      setBlessingPoints(wedding.blessingPoints || 0);
-      setTotalGifts(wedding.totalGifts || wedding.totalGift || 0);
-    }
-  }, [wedding]);
+    if (!id) return;
+    const interval = setInterval(() => {
+      loadWedding(id);
+      loadBlessingMessages(id);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [loadWedding, loadBlessingMessages, id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -54,36 +59,21 @@ export default function WeddingLivePage() {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setBlessingPoints((prev) => prev + Math.floor(Math.random() * 10) + 5);
-      setInteractions((prev) => prev + 1);
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, []);
-
   const handleSendBlessing = async () => {
     if (!message.trim() || !currentPlayer || !wedding) return;
     
     const success = await sendBlessing(wedding.id, currentPlayer.id, message, giftAmount);
     if (success) {
       setMessage('');
-      setBlessingPoints((prev) => prev + 10 + Math.floor(giftAmount / 10));
-      setInteractions((prev) => prev + 1);
-      setTotalGifts((prev) => prev + giftAmount);
-      
-      const newBlessing: BlessingMessage = {
-        id: Date.now().toString(),
-        playerId: currentPlayer.id,
-        playerName: currentPlayer.name,
-        playerAvatar: currentPlayer.avatar,
-        message,
-        giftAmount,
-        timestamp: new Date().toISOString(),
-      };
-      addBlessingMessage(newBlessing);
     }
+  };
+
+  const handlePlayGame = async (gameType: string) => {
+    if (!currentPlayer || !wedding || gamePlaying) return;
+    setGamePlaying(true);
+    await playMiniGame(wedding.id, currentPlayer.id, gameType);
+    await loadWedding(wedding.id);
+    setGamePlaying(false);
   };
 
   const phaseNames = {
@@ -109,6 +99,20 @@ export default function WeddingLivePage() {
     '幸福美满！',
     '甜甜蜜蜜！',
   ];
+
+  const miniGames = [
+    { id: 'redPacket', name: '抢红包', icon: '🧧' },
+    { id: 'dice', name: '摇骰子', icon: '🎲' },
+    { id: 'blessingChain', name: '祝福接龙', icon: '🔗' },
+  ];
+
+  const topGuests = [...(wedding?.guests || [])]
+    .sort((a: Guest, b: Guest) => b.giftAmount - a.giftAmount)
+    .slice(0, 3);
+
+  const blessingPoints = wedding?.blessingPoints || 0;
+  const interactions = wedding?.guestCount || 0;
+  const totalGifts = wedding?.totalGifts || wedding?.totalGift || 0;
 
   return (
     <div className="min-h-screen pt-20 pb-12 relative overflow-hidden">
@@ -241,6 +245,49 @@ export default function WeddingLivePage() {
               </MagicCard>
             </div>
 
+            <MagicCard hover={false} className="mb-6">
+              <h3 className="font-display text-lg font-bold mb-4 flex items-center gap-2">
+                <Gift className="w-5 h-5 text-magic-gold" />
+                互动小游戏
+              </h3>
+              <div className="grid grid-cols-3 gap-3">
+                {miniGames.map((game) => (
+                  <MagicButton
+                    key={game.id}
+                    onClick={() => handlePlayGame(game.id)}
+                    disabled={gamePlaying || !currentPlayer}
+                    variant="secondary"
+                    className="flex flex-col items-center gap-2 py-4"
+                  >
+                    <span className="text-3xl">{game.icon}</span>
+                    <span className="text-sm">{game.name}</span>
+                  </MagicButton>
+                ))}
+              </div>
+              {wedding?.miniGames && wedding.miniGames.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-magic-purple/20">
+                  <p className="text-xs text-gray-400 mb-2">最近游戏记录</p>
+                  <div className="space-y-2 max-h-24 overflow-y-auto">
+                    {wedding.miniGames.slice(-3).reverse().map((result) => (
+                      <div key={result.id} className="flex items-center justify-between text-sm bg-magic-darker/50 rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span>{result.playerAvatar}</span>
+                          <span>{result.playerName}</span>
+                          <span className="text-gray-400">玩了</span>
+                          <span className="text-magic-gold">
+                            {result.gameType === 'redPacket' && '抢红包'}
+                            {result.gameType === 'dice' && '摇骰子'}
+                            {result.gameType === 'blessingChain' && '祝福接龙'}
+                          </span>
+                        </div>
+                        <span className="text-magic-pink">+{result.score}积分 +{result.reward}💰</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </MagicCard>
+
             <MagicCard hover={false}>
               <h3 className="font-display text-lg font-bold mb-4 flex items-center gap-2">
                 <MessageCircle className="w-5 h-5 text-magic-purple" />
@@ -318,21 +365,23 @@ export default function WeddingLivePage() {
             <MagicCard hover={false}>
               <h3 className="font-display text-lg font-bold mb-4 flex items-center gap-2">
                 <Users className="w-5 h-5 text-magic-blue" />
-                在线宾客 ({wedding?.guestCount || 128})
+                在线宾客 ({wedding?.guestCount || 0})
               </h3>
               <div className="flex flex-wrap gap-2">
-                {[...Array(20)].map((_, i) => (
+                {(wedding?.guests || []).slice(0, 20).map((guest, i) => (
                   <div
-                    key={i}
+                    key={guest.playerId + i}
                     className="w-10 h-10 rounded-full bg-magic-gradient flex items-center justify-center text-lg"
-                    style={{ animationDelay: `${i * 0.1}s` }}
+                    title={guest.player?.name}
                   >
-                    {['🧙', '🧝', '🧚', '🧛', '🧜', '🧞'][i % 6]}
+                    {guest.player?.avatar || ['🧙', '🧝', '🧚', '🧛', '🧜', '🧞'][i % 6]}
                   </div>
                 ))}
-                <div className="w-10 h-10 rounded-full bg-magic-purple/30 flex items-center justify-center text-xs text-gray-400">
-                  +{wedding?.guestCount ? wedding.guestCount - 20 : 108}
-                </div>
+                {(wedding?.guestCount || 0) > 20 && (
+                  <div className="w-10 h-10 rounded-full bg-magic-purple/30 flex items-center justify-center text-xs text-gray-400">
+                    +{(wedding?.guestCount || 0) - 20}
+                  </div>
+                )}
               </div>
             </MagicCard>
 
@@ -348,17 +397,21 @@ export default function WeddingLivePage() {
                     {wedding?.style === 'fairyTale' && '🏰 梦幻童话'}
                     {wedding?.style === 'starryNight' && '✨ 星空主题'}
                     {wedding?.style === 'xianxia' && '⛩️ 仙侠情缘'}
+                    {wedding?.style === 'darkFantasy' && '🌙 魔幻暗黑'}
+                    {wedding?.style === 'oceanDream' && '🌊 海洋之梦'}
+                    {wedding?.style === 'forestWonder' && '🌲 森林奇境'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">豪华度</span>
-                  <span className="font-bold text-magic-gold">{wedding?.luxuryScore || 150}</span>
+                  <span className="font-bold text-magic-gold">{wedding?.luxuryScore || 0}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">豪华等级</span>
                   <span className="font-semibold text-magic-purple">
-                    {wedding?.luxuryScore && wedding.luxuryScore >= 150 ? '💎 璀璨' :
-                     wedding?.luxuryScore && wedding.luxuryScore >= 100 ? '👑 豪华' : '✨ 精致'}
+                    {wedding?.luxuryScore && wedding.luxuryScore >= 500 ? '💎 至尊' :
+                     wedding?.luxuryScore && wedding.luxuryScore >= 300 ? '👑 璀璨' :
+                     wedding?.luxuryScore && wedding.luxuryScore >= 150 ? '✨ 豪华' : '💕 精致'}
                   </span>
                 </div>
               </div>
@@ -370,21 +423,24 @@ export default function WeddingLivePage() {
                 祝福排行榜
               </h3>
               <div className="space-y-2">
-                {[
-                  { name: '星辰法师', amount: 1000, avatar: '🧙' },
-                  { name: '月光精灵', amount: 500, avatar: '🧝' },
-                  { name: '暗影刺客', amount: 300, avatar: '🥷' },
-                ].map((guest, index) => (
-                  <div key={guest.name} className="flex items-center justify-between p-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{guest.avatar}</span>
-                      <span className="text-sm">{guest.name}</span>
+                {topGuests.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-4">暂无宾客祝福</p>
+                ) : (
+                  topGuests.map((guest, index) => (
+                    <div key={guest.playerId} className="flex items-center justify-between p-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 flex items-center justify-center text-sm font-bold rounded-full bg-magic-gradient">
+                          {index + 1}
+                        </span>
+                        <span className="text-lg">{guest.player?.avatar || '🧙'}</span>
+                        <span className="text-sm">{guest.player?.name || '神秘玩家'}</span>
+                      </div>
+                      <span className="text-magic-gold font-semibold text-sm">
+                        {guest.giftAmount} 💰
+                      </span>
                     </div>
-                    <span className="text-magic-gold font-semibold text-sm">
-                      {guest.amount} 💰
-                    </span>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </MagicCard>
           </div>

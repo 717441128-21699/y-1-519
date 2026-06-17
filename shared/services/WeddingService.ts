@@ -1,4 +1,4 @@
-import type { Wedding, WeddingStyle, Decoration, Guest, BlessingMessage } from '../types';
+import type { Wedding, WeddingStyle, Decoration, Guest, BlessingMessage, MiniGameResult } from '../types';
 import { mockWeddings, getMarriageById, getPlayerById, generateId, mockItems, mockGuildHalls } from '../mockData';
 
 export class WeddingService {
@@ -266,14 +266,77 @@ export class WeddingService {
     };
   }
 
+  static getBlessingMessages(weddingId: string): BlessingMessage[] {
+    const wedding = mockWeddings.find(w => w.id === weddingId);
+    if (!wedding) return [];
+    return wedding.guests.map(g => ({
+      id: generateId(),
+      playerId: g.playerId,
+      playerName: g.player?.name || '神秘玩家',
+      playerAvatar: g.player?.avatar || '🧙',
+      message: g.message,
+      giftAmount: g.giftAmount,
+      timestamp: g.blessedAt,
+    }));
+  }
+
+  static playMiniGame(weddingId: string, playerId: string, gameType: string): { success: boolean; result?: MiniGameResult; message: string } {
+    const wedding = mockWeddings.find(w => w.id === weddingId);
+    if (!wedding) {
+      return { success: false, message: '婚礼不存在！' };
+    }
+    if (wedding.status === 'completed') {
+      return { success: false, message: '婚礼已结束！' };
+    }
+    const player = getPlayerById(playerId);
+    if (!player) {
+      return { success: false, message: '玩家不存在！' };
+    }
+    const score = Math.floor(Math.random() * 41) + 10;
+    const reward = Math.floor(Math.random() * 91) + 10;
+    const result: MiniGameResult = {
+      id: generateId(),
+      gameType,
+      playerId,
+      playerName: player.name,
+      playerAvatar: player.avatar,
+      score,
+      reward,
+      timestamp: new Date().toISOString(),
+    };
+    if (!wedding.miniGames) {
+      wedding.miniGames = [];
+    }
+    wedding.miniGames.push(result);
+    wedding.blessingPoints += score;
+    wedding.totalGift += reward;
+    wedding.totalGifts = (wedding.totalGifts || 0) + reward;
+    return {
+      success: true,
+      result,
+      message: `🎉 游戏完成！获得 ${score} 祝福积分和 ${reward} 金币奖励！`,
+    };
+  }
+
+  private static enrichWedding(wedding: Wedding): Wedding {
+    wedding.marriage = getMarriageById(wedding.marriageId);
+    const p1 = getPlayerById(wedding.marriage?.player1Id || '');
+    const p2 = getPlayerById(wedding.marriage?.player2Id || '');
+    if (!wedding.partner1 && p1) wedding.partner1 = p1;
+    if (!wedding.partner2 && p2) wedding.partner2 = p2;
+    if (!wedding.partner1Name && p1) wedding.partner1Name = p1.name;
+    if (!wedding.partner2Name && p2) wedding.partner2Name = p2.name;
+    wedding.guests = wedding.guests.map(g => ({
+      ...g,
+      player: getPlayerById(g.playerId),
+    }));
+    return wedding;
+  }
+
   static getWeddingById(weddingId: string): Wedding | undefined {
     const wedding = mockWeddings.find(w => w.id === weddingId);
     if (wedding) {
-      wedding.marriage = getMarriageById(wedding.marriageId);
-      wedding.guests = wedding.guests.map(g => ({
-        ...g,
-        player: getPlayerById(g.playerId),
-      }));
+      return this.enrichWedding(wedding);
     }
     return wedding;
   }
@@ -281,13 +344,15 @@ export class WeddingService {
   static getWeddingsByMarriage(marriageId: string): Wedding[] {
     return mockWeddings
       .filter(w => w.marriageId === marriageId)
-      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+      .map(w => this.enrichWedding(w));
   }
 
   static getOngoingWeddings(): Wedding[] {
     return mockWeddings
       .filter(w => w.status === 'ongoing')
-      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+      .map(w => this.enrichWedding(w));
   }
 
   static getWeddingAnnouncement(wedding: Wedding): string {

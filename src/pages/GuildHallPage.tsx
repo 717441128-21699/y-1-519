@@ -1,16 +1,24 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Building2, Users, Coins, ArrowUpCircle, CheckCircle, XCircle, Crown, Sparkles } from 'lucide-react';
+import { Building2, Users, Coins, ArrowUpCircle, CheckCircle, XCircle, Crown, Sparkles, Clock, AlertTriangle } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import { MagicCard } from '../components/MagicCard';
 import { MagicButton } from '../components/MagicButton';
 import { ProgressBar } from '../components/ProgressBar';
 import { PlayerAvatar } from '../components/PlayerAvatar';
+import type { UpgradeRequest } from '../../shared/types';
 
 export default function GuildHallPage() {
-  const { currentPlayer, guildHall, loadGuildHall, contributeGuild, approveUpgrade, loading } = useGameStore();
+  const { currentPlayer, guildHall, loadCurrentPlayer, loadGuildHall, contributeGuild, approveUpgrade, loading, error } = useGameStore();
   const [contributeAmount, setContributeAmount] = useState(100);
   const [showApproveModal, setShowApproveModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadCurrentPlayer();
+  }, [loadCurrentPlayer]);
 
   useEffect(() => {
     if (currentPlayer) {
@@ -18,18 +26,81 @@ export default function GuildHallPage() {
     }
   }, [currentPlayer, loadGuildHall]);
 
+  if (loading.guildHall) {
+    return (
+      <div className="min-h-screen pt-20 pb-12 flex items-center justify-center">
+        <MagicCard className="text-center p-12 max-w-md">
+          <div className="text-6xl mb-4 animate-spin">⏳</div>
+          <h2 className="font-display text-2xl font-bold mb-4">加载中...</h2>
+          <p className="text-gray-400">正在获取公会婚庆堂信息</p>
+        </MagicCard>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen pt-20 pb-12 flex items-center justify-center">
+        <MagicCard className="text-center p-12 max-w-md">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h2 className="font-display text-2xl font-bold mb-4 text-red-400">加载错误</h2>
+          <p className="text-gray-400">{error}</p>
+        </MagicCard>
+      </div>
+    );
+  }
+
   const handleContribute = () => {
     if (!currentPlayer) return;
     contributeGuild(currentPlayer.id, contributeAmount);
   };
 
-  const handleApprove = (approve: boolean) => {
+  const handleApprove = (approve: boolean, requestId?: string) => {
     if (!currentPlayer) return;
-    approveUpgrade(currentPlayer.id, approve);
+    if (!approve) {
+      setPendingRequestId(requestId || null);
+      setShowRejectModal(true);
+      return;
+    }
+    approveUpgrade(currentPlayer.id, true);
     setShowApproveModal(false);
   };
 
-  const canApprove = currentPlayer?.guildRole === 'leader' || currentPlayer?.guildRole === 'officer';
+  const handleConfirmReject = () => {
+    if (!currentPlayer || !rejectReason.trim()) return;
+    approveUpgrade(currentPlayer.id, false, rejectReason.trim());
+    setShowRejectModal(false);
+    setRejectReason('');
+    setPendingRequestId(null);
+  };
+
+  const canApprove = currentPlayer?.guildRole === 'leader' || currentPlayer?.guildRole === 'officer' || currentPlayer?.guildRole === 'president' || currentPlayer?.guildRole === 'vicePresident';
+
+  const getStatusBadge = (status: UpgradeRequest['status']) => {
+    switch (status) {
+      case 'pending':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-400">
+            <Clock className="w-3 h-3" />
+            待审批
+          </span>
+        );
+      case 'approved':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-green-500/20 text-green-400">
+            <CheckCircle className="w-3 h-3" />
+            已通过
+          </span>
+        );
+      case 'rejected':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-400">
+            <XCircle className="w-3 h-3" />
+            已拒绝
+          </span>
+        );
+    }
+  };
 
   if (!guildHall) {
     return (
@@ -308,7 +379,162 @@ export default function GuildHallPage() {
             ))}
           </div>
         </MagicCard>
+
+        <MagicCard hover={false} className="mt-6">
+          <h2 className="font-display text-xl font-bold mb-6 flex items-center gap-2">
+            <ArrowUpCircle className="w-5 h-5 text-magic-blue" />
+            升级申请记录
+          </h2>
+
+          {guildHall.upgradeRequests && guildHall.upgradeRequests.length > 0 ? (
+            <div className="space-y-3">
+              {guildHall.upgradeRequests.map((request, index) => (
+                <motion.div
+                  key={request.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className={`p-4 rounded-xl border ${
+                    request.status === 'pending'
+                      ? 'bg-yellow-500/10 border-yellow-500/30'
+                      : request.status === 'approved'
+                      ? 'bg-green-500/5 border-green-500/20'
+                      : 'bg-red-500/5 border-red-500/20'
+                  }`}
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-magic-gradient flex items-center justify-center text-2xl">
+                        {request.applicant?.avatar || '🧙'}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold">{request.applicant?.name || '未知玩家'}</span>
+                          {getStatusBadge(request.status)}
+                        </div>
+                        <p className="text-sm text-gray-400">
+                          申请升级 Lv.{request.fromLevel} → Lv.{request.toLevel}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          申请时间：{new Date(request.createdAt).toLocaleString('zh-CN')}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-2">
+                      {request.status === 'pending' && canApprove && (
+                        <div className="flex gap-2">
+                          <MagicButton
+                            variant="success"
+                            size="sm"
+                            onClick={() => handleApprove(true, request.id)}
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            批准
+                          </MagicButton>
+                          <MagicButton
+                            variant="danger"
+                            size="sm"
+                            onClick={() => handleApprove(false, request.id)}
+                          >
+                            <XCircle className="w-4 h-4" />
+                            拒绝
+                          </MagicButton>
+                        </div>
+                      )}
+                      {request.status === 'approved' && request.approver && (
+                        <div className="text-right">
+                          <p className="text-sm text-green-400">
+                            审批人：{request.approver.name}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {request.approvedAt && new Date(request.approvedAt).toLocaleString('zh-CN')}
+                          </p>
+                        </div>
+                      )}
+                      {request.status === 'rejected' && (
+                        <div className="text-right max-w-xs">
+                          {request.approver && (
+                            <p className="text-sm text-red-400">
+                              审批人：{request.approver.name}
+                            </p>
+                          )}
+                          {request.rejectedAt && (
+                            <p className="text-xs text-gray-500">
+                              {new Date(request.rejectedAt).toLocaleString('zh-CN')}
+                            </p>
+                          )}
+                          {request.rejectReason && (
+                            <div className="mt-2 p-2 bg-red-500/10 rounded-lg border border-red-500/20">
+                              <p className="text-xs text-red-300 flex items-start gap-1">
+                                <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                拒绝原因：{request.rejectReason}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {request.status === 'pending' && !canApprove && (
+                        <p className="text-xs text-yellow-400">等待审批中...</p>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-gray-400">
+              <ArrowUpCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>暂无升级申请记录</p>
+            </div>
+          )}
+        </MagicCard>
       </div>
+
+      {showRejectModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md"
+          >
+            <MagicCard hover={false} className="p-6">
+              <h3 className="font-display text-xl font-bold mb-4 flex items-center gap-2">
+                <XCircle className="w-5 h-5 text-red-400" />
+                拒绝升级申请
+              </h3>
+              <p className="text-gray-400 mb-4">请填写拒绝原因：</p>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="请输入拒绝原因..."
+                className="magic-input w-full h-32 resize-none"
+              />
+              <div className="flex gap-3 mt-6">
+                <MagicButton
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowRejectModal(false);
+                    setRejectReason('');
+                    setPendingRequestId(null);
+                  }}
+                >
+                  取消
+                </MagicButton>
+                <MagicButton
+                  variant="danger"
+                  className="flex-1"
+                  onClick={handleConfirmReject}
+                  disabled={!rejectReason.trim()}
+                >
+                  确认拒绝
+                </MagicButton>
+              </div>
+            </MagicCard>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

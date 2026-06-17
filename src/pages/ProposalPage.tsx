@@ -11,19 +11,31 @@ import type { Item, Player } from '../../shared/types';
 import { proposalApi } from '../utils/apiClient';
 
 export default function ProposalPage() {
-  const { currentPlayer, players, items, loadPlayers, loadItems, submitProposal, loading } = useGameStore();
+  const { currentPlayer, players, items, loadCurrentPlayer, loadPlayers, loadItems, submitProposal, loading } = useGameStore();
   const [selectedTarget, setSelectedTarget] = useState<Player | null>(null);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [successRate, setSuccessRate] = useState<number | null>(null);
   const [intimacy, setIntimacy] = useState<number>(0);
   const [qualityBonus, setQualityBonus] = useState<number>(0);
+  const [intimacyFactor, setIntimacyFactor] = useState<number>(0);
   const [showResult, setShowResult] = useState(false);
-  const [result, setResult] = useState<{ success: boolean; message: string; randomEvent?: string; successRate?: number } | null>(null);
+  const [result, setResult] = useState<{
+    success: boolean;
+    message: string;
+    randomEvent?: string;
+    successRate?: number;
+    baseRate: number;
+    eventBonus: number;
+    finalRate: number;
+    rollResult: number;
+    eventEffectMessage?: string;
+  } | null>(null);
 
   useEffect(() => {
+    loadCurrentPlayer();
     loadPlayers();
     loadItems();
-  }, [loadPlayers, loadItems]);
+  }, [loadCurrentPlayer, loadPlayers, loadItems]);
 
   useEffect(() => {
     if (selectedTarget && selectedItem && currentPlayer) {
@@ -32,6 +44,7 @@ export default function ProposalPage() {
       setSuccessRate(null);
       setIntimacy(0);
       setQualityBonus(0);
+      setIntimacyFactor(0);
     }
   }, [selectedTarget, selectedItem, currentPlayer]);
 
@@ -45,10 +58,11 @@ export default function ProposalPage() {
         tokenItemId: selectedItem.id,
       });
       if (response.success) {
-        const data = response.data as { successRate: number; intimacy: number; qualityBonus: number };
+        const data = response.data as { successRate: number; intimacy: number; qualityBonus: number; intimacyFactor: number };
         setSuccessRate(data.successRate);
         setIntimacy(data.intimacy);
         setQualityBonus(data.qualityBonus);
+        setIntimacyFactor(data.intimacyFactor);
       }
     } catch (error) {
       console.error('计算成功率失败', error);
@@ -149,34 +163,38 @@ export default function ProposalPage() {
                 求婚预测
               </h3>
 
-              <div className="grid md:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <p className="text-sm text-gray-400 mb-2">亲密度</p>
-                  <ProgressBar
-                    value={intimacy}
-                    max={100}
-                    color="pink"
-                    label={selectedTarget ? `与 ${selectedTarget.name}` : ''}
-                  />
-                </div>
-
-                <div className="text-center">
-                  <p className="text-sm text-gray-400 mb-2">道具加成</p>
-                  <div className="text-3xl font-bold text-magic-gold">
-                    {qualityBonus > 0 ? `+${qualityBonus}%` : '--'}
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-400 mb-2">亲密度</p>
+                    <ProgressBar
+                      value={intimacy}
+                      max={100}
+                      color="pink"
+                      label={selectedTarget ? `与 ${selectedTarget.name}` : ''}
+                    />
                   </div>
-                  {selectedItem && (
-                    <p className="text-sm text-gray-400">{selectedItem.name}</p>
-                  )}
+                  <div className="flex justify-between items-center p-3 bg-magic-darker/50 rounded-lg">
+                    <span className="text-sm text-gray-400">亲密度加成</span>
+                    <span className="text-lg font-bold text-magic-pink">
+                      {intimacyFactor > 0 ? `+${intimacyFactor}%` : '--'}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="text-center">
-                  <p className="text-sm text-gray-400 mb-2">预计成功率</p>
-                  <motion.div
-                    key={successRate}
-                    initial={{ scale: 0.5, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className={`text-4xl font-bold ${
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-400 mb-2">道具品质加成</p>
+                    <div className="text-3xl font-bold text-magic-gold">
+                      {qualityBonus > 0 ? `+${qualityBonus}%` : '--'}
+                    </div>
+                    {selectedItem && (
+                      <p className="text-sm text-gray-400">{selectedItem.name}</p>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-magic-darker/50 rounded-lg">
+                    <span className="text-sm text-gray-400">基础成功率</span>
+                    <span className={`text-lg font-bold ${
                       successRate === null
                         ? 'text-gray-500'
                         : successRate >= 70
@@ -184,11 +202,33 @@ export default function ProposalPage() {
                         : successRate >= 40
                         ? 'text-yellow-400'
                         : 'text-red-400'
-                    }`}
-                  >
-                    {successRate !== null ? `${successRate}%` : '--'}
-                  </motion.div>
+                    }`}>
+                      {successRate !== null ? `${successRate}%` : '--'}
+                    </span>
+                  </div>
                 </div>
+              </div>
+
+              <div className="mt-6 flex justify-center">
+                <motion.div
+                  key={successRate}
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="text-center"
+                >
+                  <p className="text-sm text-gray-400 mb-1">预计成功率</p>
+                  <div className={`text-5xl font-bold ${
+                    successRate === null
+                      ? 'text-gray-500'
+                      : successRate >= 70
+                      ? 'text-green-400'
+                      : successRate >= 40
+                      ? 'text-yellow-400'
+                      : 'text-red-400'
+                  }`}>
+                    {successRate !== null ? `${successRate}%` : '--'}
+                  </div>
+                </motion.div>
               </div>
 
               <div className="mt-6 p-4 bg-magic-darker/50 rounded-xl border border-magic-purple/30">
@@ -197,7 +237,10 @@ export default function ProposalPage() {
                   <div>
                     <p className="font-semibold text-yellow-400 mb-1">随机事件提示</p>
                     <p className="text-sm text-gray-400">
-                      求婚过程中有10%概率触发「情劫」（成功率-20%），15%概率触发「天降祥瑞」（成功率+20%）
+                      求婚过程中有10%概率触发「情劫」（成功率-20%），15%概率触发「天降祥瑞」（成功率+25%）
+                    </p>
+                    <p className="text-sm text-magic-purple mt-1">
+                      随机事件范围：<span className="text-red-400">-20%</span> ~ <span className="text-green-400">+25%</span>
                     </p>
                   </div>
                 </div>
@@ -245,37 +288,89 @@ export default function ProposalPage() {
                     {result.success ? '💖' : '💔'}
                   </motion.div>
 
-                  {result.randomEvent && (
+                  {result.eventEffectMessage && (
                     <motion.div
                       initial={{ y: -20, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
                       className={`mb-4 px-4 py-2 rounded-full inline-block ${
-                        result.randomEvent === 'heavenlyBlessing'
+                        result.eventBonus > 0
                           ? 'bg-yellow-500/20 text-yellow-400'
-                          : 'bg-red-500/20 text-red-400'
+                          : result.eventBonus < 0
+                          ? 'bg-red-500/20 text-red-400'
+                          : ''
                       }`}
                     >
-                      {result.randomEvent === 'heavenlyBlessing' ? '🌟 天降祥瑞！' : '⚡ 情劫降临！'}
+                      {result.eventBonus > 0 ? '🌟 天降祥瑞！' : result.eventBonus < 0 ? '⚡ 情劫降临！' : ''}
                     </motion.div>
                   )}
 
-                  <h2 className={`font-display text-3xl font-bold mb-4 ${
+                  <h2 className={`font-display text-3xl font-bold mb-6 ${
                     result.success ? 'text-magic-pink' : 'text-gray-400'
                   }`}>
                     {result.success ? '求婚成功！' : '求婚失败...'}
                   </h2>
-                  
-                  {result.successRate !== undefined && (
-                    <div className="mb-4 p-3 bg-magic-darker/50 rounded-lg">
-                      <p className="text-sm text-gray-400">实际成功率</p>
-                      <p className={`text-2xl font-bold ${
-                        result.successRate >= 70 ? 'text-green-400' :
-                        result.successRate >= 40 ? 'text-yellow-400' : 'text-red-400'
-                      }`}>
-                        {result.successRate}%
-                      </p>
+
+                  <div className="mb-6 p-4 bg-magic-darker/50 rounded-lg text-left space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-400">基础成功率</span>
+                      <span className="text-lg font-bold text-white">{result.baseRate}%</span>
                     </div>
-                  )}
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-400">
+                        随机事件
+                        {result.eventEffectMessage ? ` (${result.eventEffectMessage.split('！')[0]}！)` : ' (无)'}
+                      </span>
+                      <span className={`text-lg font-bold ${
+                        result.eventBonus > 0 ? 'text-green-400' :
+                        result.eventBonus < 0 ? 'text-red-400' : 'text-gray-500'
+                      }`}>
+                        {result.eventBonus > 0 ? `+${result.eventBonus}%` : result.eventBonus < 0 ? `${result.eventBonus}%` : '0%'}
+                      </span>
+                    </div>
+                    <div className="border-t border-magic-purple/30 pt-3 flex justify-between items-center">
+                      <span className="text-sm text-gray-300 font-semibold">最终成功率</span>
+                      <span className={`text-xl font-bold ${
+                        result.finalRate >= 70 ? 'text-green-400' :
+                        result.finalRate >= 40 ? 'text-yellow-400' : 'text-red-400'
+                      }`}>
+                        {result.finalRate}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mb-6 p-4 bg-magic-darker/50 rounded-lg">
+                    <p className="text-sm text-gray-400 mb-3">判定结果</p>
+                    <div className="relative w-full h-8 bg-magic-darker rounded-full overflow-hidden mb-2">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${result.finalRate}%` }}
+                        transition={{ duration: 1, ease: 'easeOut' }}
+                        className={`absolute left-0 top-0 h-full rounded-full ${
+                          result.success
+                            ? 'bg-gradient-to-r from-green-600 to-emerald-400'
+                            : 'bg-gradient-to-r from-red-600 to-rose-400'
+                        }`}
+                      />
+                      <motion.div
+                        initial={{ left: 0 }}
+                        animate={{ left: `${result.rollResult}%` }}
+                        transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
+                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-6 h-6 bg-white rounded-full shadow-lg flex items-center justify-center text-xs font-bold text-magic-darker border-2 border-magic-purple"
+                      >
+                        🎲
+                      </motion.div>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>0%</span>
+                      <span className="text-magic-gold font-semibold">掷出了 {result.rollResult}</span>
+                      <span>100%</span>
+                    </div>
+                    <p className={`mt-3 text-sm font-semibold ${
+                      result.success ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {result.rollResult < result.finalRate ? '成功' : '失败'}（{result.rollResult} {result.success ? '<' : '≥'} {result.finalRate}）
+                    </p>
+                  </div>
                   
                   <p className="text-gray-300 mb-6">{result.message}</p>
                   

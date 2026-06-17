@@ -1,15 +1,15 @@
-import type { Player, Item, Skill, Marriage, Wedding, Guild, GuildWeddingHall, Proposal, DailyLoveRecord } from './types';
+import type { Player, Item, Skill, Marriage, Wedding, Guild, GuildWeddingHall, Proposal, DailyLoveRecord, UpgradeRequest } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
 export const mockPlayers: Player[] = [
-  { id: 'p1', name: '月影法师', level: 85, avatar: '🧙‍♂️', guildId: 'g1', guildRole: 'president' },
-  { id: 'p2', name: '星辰骑士', level: 82, avatar: '⚔️', guildId: 'g1', guildRole: 'vicePresident' },
-  { id: 'p3', name: '烈焰术士', level: 78, avatar: '🔥', guildId: 'g1', guildRole: 'member' },
-  { id: 'p4', name: '冰霜女巫', level: 88, avatar: '❄️', guildId: 'g2', guildRole: 'president' },
-  { id: 'p5', name: '暗夜刺客', level: 75, avatar: '🗡️', guildId: 'g2', guildRole: 'member' },
-  { id: 'p6', name: '神圣牧师', level: 80, avatar: '✨', guildId: 'g1', guildRole: 'member' },
-  { id: 'p7', name: '风暴召唤师', level: 76, avatar: '🌪️', guildId: 'g2', guildRole: 'member' },
-  { id: 'p8', name: '大地守护者', level: 90, avatar: '🌍', guildId: 'g1', guildRole: 'member' },
+  { id: 'p1', name: '月影法师', level: 85, avatar: '🧙‍♂️', class: '法师', guildId: 'g1', guildRole: 'president' },
+  { id: 'p2', name: '星辰骑士', level: 82, avatar: '⚔️', class: '骑士', guildId: 'g1', guildRole: 'vicePresident' },
+  { id: 'p3', name: '烈焰术士', level: 78, avatar: '🔥', class: '术士', guildId: 'g1', guildRole: 'member' },
+  { id: 'p4', name: '冰霜女巫', level: 88, avatar: '❄️', class: '女巫', guildId: 'g2', guildRole: 'president' },
+  { id: 'p5', name: '暗夜刺客', level: 75, avatar: '🗡️', class: '刺客', guildId: 'g2', guildRole: 'member' },
+  { id: 'p6', name: '神圣牧师', level: 80, avatar: '✨', class: '牧师', guildId: 'g1', guildRole: 'member' },
+  { id: 'p7', name: '风暴召唤师', level: 76, avatar: '🌪️', class: '召唤师', guildId: 'g2', guildRole: 'member' },
+  { id: 'p8', name: '大地守护者', level: 90, avatar: '🌍', class: '守护者', guildId: 'g1', guildRole: 'member' },
 ];
 
 export const mockItems: Item[] = [
@@ -64,6 +64,72 @@ export const mockGuilds: Guild[] = [
   },
 ];
 
+export const mockUpgradeRequests: UpgradeRequest[] = [
+  {
+    id: 'ur1',
+    hallId: 'gh1',
+    applicantId: 'p3',
+    applicant: mockPlayers[2],
+    fromLevel: 1,
+    toLevel: 2,
+    status: 'approved',
+    createdAt: '2026-05-20',
+    approvedAt: '2026-05-21',
+    approverId: 'p1',
+    approver: mockPlayers[0],
+  },
+  {
+    id: 'ur2',
+    hallId: 'gh1',
+    applicantId: 'p2',
+    applicant: mockPlayers[1],
+    fromLevel: 2,
+    toLevel: 3,
+    status: 'approved',
+    createdAt: '2026-06-01',
+    approvedAt: '2026-06-02',
+    approverId: 'p1',
+    approver: mockPlayers[0],
+  },
+  {
+    id: 'ur3',
+    hallId: 'gh1',
+    applicantId: 'p6',
+    applicant: mockPlayers[5],
+    fromLevel: 2,
+    toLevel: 3,
+    status: 'rejected',
+    createdAt: '2026-05-25',
+    rejectedAt: '2026-05-26',
+    approverId: 'p1',
+    approver: mockPlayers[0],
+    rejectReason: '当前公会活动较少，建议先积累更多贡献值再升级',
+  },
+  {
+    id: 'ur4',
+    hallId: 'gh2',
+    applicantId: 'p4',
+    applicant: mockPlayers[3],
+    fromLevel: 2,
+    toLevel: 3,
+    status: 'pending',
+    createdAt: '2026-06-15',
+  },
+  {
+    id: 'ur5',
+    hallId: 'gh2',
+    applicantId: 'p5',
+    applicant: mockPlayers[4],
+    fromLevel: 1,
+    toLevel: 2,
+    status: 'approved',
+    createdAt: '2026-06-05',
+    approvedAt: '2026-06-06',
+    approverId: 'p4',
+    approver: mockPlayers[3],
+  },
+];
+
 export const mockGuildHalls: GuildWeddingHall[] = [
   {
     id: 'gh1',
@@ -87,6 +153,7 @@ export const mockGuildHalls: GuildWeddingHall[] = [
       { id: 'c2', hallId: 'gh1', playerId: 'p2', player: mockPlayers[1], amount: 800, createdAt: '2026-06-11' },
       { id: 'c3', hallId: 'gh1', playerId: 'p3', player: mockPlayers[2], amount: 500, createdAt: '2026-06-12' },
     ],
+    upgradeRequests: mockUpgradeRequests.filter(r => r.hallId === 'gh1'),
   },
   {
     id: 'gh2',
@@ -110,6 +177,7 @@ export const mockGuildHalls: GuildWeddingHall[] = [
       { id: 'c4', hallId: 'gh2', playerId: 'p4', player: mockPlayers[3], amount: 600, createdAt: '2026-06-10' },
       { id: 'c5', hallId: 'gh2', playerId: 'p5', player: mockPlayers[4], amount: 400, createdAt: '2026-06-13' },
     ],
+    upgradeRequests: mockUpgradeRequests.filter(r => r.hallId === 'gh2'),
   },
 ];
 
@@ -196,6 +264,10 @@ export const mockWeddings: Wedding[] = [
     id: 'w1',
     marriageId: 'm1',
     marriage: mockMarriages[0],
+    partner1: mockPlayers[0],
+    partner2: mockPlayers[3],
+    partner1Name: '月影法师',
+    partner2Name: '星光术士',
     style: 'starryNight',
     decorations: [
       { id: 'd1', itemId: 'i7', itemName: '水晶婚鞋', positionX: 2, positionY: 3, luxuryBonus: 95 },
@@ -204,16 +276,30 @@ export const mockWeddings: Wedding[] = [
     ],
     luxuryScore: 280,
     startTime: '2026-06-20T19:00:00',
-    status: 'preparing',
-    guests: [],
-    blessingPoints: 0,
-    totalGift: 0,
+    status: 'ongoing',
+    guests: [
+      { playerId: 'p2', player: mockPlayers[1], giftAmount: 500, message: '祝你们百年好合，永结同心！', blessedAt: '2026-06-20T19:05:00' },
+      { playerId: 'p3', player: mockPlayers[2], giftAmount: 300, message: '愿星光永远照耀你们！', blessedAt: '2026-06-20T19:08:00' },
+      { playerId: 'p5', player: mockPlayers[4], giftAmount: 200, message: '甜蜜幸福，早生贵子！', blessedAt: '2026-06-20T19:12:00' },
+    ],
+    guestCount: 3,
+    blessingPoints: 185,
+    totalGift: 1000,
+    totalGifts: 1000,
+    miniGames: [
+      { id: 'mg1', gameType: 'redPacket', playerId: 'p2', playerName: '烈焰战士', playerAvatar: '⚔️', score: 35, reward: 50, timestamp: '2026-06-20T19:10:00' },
+      { id: 'mg2', gameType: 'dice', playerId: 'p3', playerName: '森林精灵', playerAvatar: '🧝', score: 28, reward: 35, timestamp: '2026-06-20T19:15:00' },
+    ],
     createdAt: '2026-06-15',
   },
   {
     id: 'w2',
     marriageId: 'm2',
     marriage: mockMarriages[1],
+    partner1: mockPlayers[1],
+    partner2: mockPlayers[5],
+    partner1Name: '烈焰战士',
+    partner2Name: '月神祭司',
     style: 'fairyTale',
     decorations: [
       { id: 'd4', itemId: 'i4', itemName: '真爱花束', positionX: 1, positionY: 2, luxuryBonus: 45 },

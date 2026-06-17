@@ -1,5 +1,5 @@
-import type { GuildWeddingHall, ContributionRecord } from '../types';
-import { mockGuildHalls, mockGuilds, getPlayerById, generateId } from '../mockData';
+import type { GuildWeddingHall, ContributionRecord, UpgradeRequest } from '../types';
+import { mockGuildHalls, mockGuilds, mockUpgradeRequests, getPlayerById, generateId } from '../mockData';
 
 export class GuildService {
   static getExpToNextLevel(level: number): number {
@@ -25,6 +25,14 @@ export class GuildService {
       if (hall.upgradeApplicantId) {
         hall.upgradeApplicant = getPlayerById(hall.upgradeApplicantId);
       }
+      hall.upgradeRequests = mockUpgradeRequests
+        .filter(r => r.hallId === hall.id)
+        .map(r => ({
+          ...r,
+          applicant: getPlayerById(r.applicantId),
+          approver: r.approverId ? getPlayerById(r.approverId) : undefined,
+        }))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
     return hall;
   }
@@ -52,9 +60,6 @@ export class GuildService {
 
     hall.exp = (hall.exp || 0) + amount;
     hall.currentContribution = (hall.currentContribution || 0) + amount;
-    hall.pendingApproval = false;
-    hall.pendingUpgrade = false;
-    hall.upgradeApplicantId = null;
 
     const record: ContributionRecord = {
       id: generateId(),
@@ -72,12 +77,34 @@ export class GuildService {
 
     const expToNext = hall.expToNext || this.getExpToNextLevel(hall.level);
     const upgradeRequired = hall.upgradeRequired || this.getExpToNextLevel(hall.level);
+    const hasPendingRequest = hall.upgradeRequests?.some(r => r.status === 'pending');
 
-    if (hall.currentContribution >= upgradeRequired || hall.exp >= expToNext) {
+    if ((hall.currentContribution >= upgradeRequired || hall.exp >= expToNext) && !hasPendingRequest) {
       hall.pendingApproval = true;
       hall.pendingUpgrade = true;
       hall.upgradeApplicantId = playerId;
       hall.upgradeApplicant = player;
+
+      const upgradeRequest: UpgradeRequest = {
+        id: generateId(),
+        hallId: hall.id,
+        applicantId: playerId,
+        applicant: player,
+        fromLevel: hall.level,
+        toLevel: hall.level + 1,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      };
+      mockUpgradeRequests.unshift(upgradeRequest);
+      hall.upgradeRequests = mockUpgradeRequests
+        .filter(r => r.hallId === hall.id)
+        .map(r => ({
+          ...r,
+          applicant: getPlayerById(r.applicantId),
+          approver: r.approverId ? getPlayerById(r.approverId) : undefined,
+        }))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
       return {
         success: true,
         hall,
@@ -125,7 +152,7 @@ export class GuildService {
     };
   }
 
-  static approveUpgrade(playerId: string, approve: boolean): { success: boolean; message: string; hall?: GuildWeddingHall } {
+  static approveUpgrade(playerId: string, approve: boolean, rejectReason?: string): { success: boolean; message: string; hall?: GuildWeddingHall } {
     const player = getPlayerById(playerId);
     if (!player?.guildId) {
       return { success: false, message: '您还没有加入公会！' };
@@ -145,7 +172,20 @@ export class GuildService {
       return { success: false, message: '没有待审批的升级申请！' };
     }
 
+    if (!approve && !rejectReason) {
+      return { success: false, message: '拒绝升级申请时必须填写拒绝原因！' };
+    }
+
+    const pendingRequest = mockUpgradeRequests.find(r => r.hallId === hall.id && r.status === 'pending');
+
     if (approve) {
+      if (pendingRequest) {
+        pendingRequest.status = 'approved';
+        pendingRequest.approverId = playerId;
+        pendingRequest.approver = player;
+        pendingRequest.approvedAt = new Date().toISOString();
+      }
+
       const oldExpToNext = hall.expToNext || this.getExpToNextLevel(hall.level);
       const oldUpgradeRequired = hall.upgradeRequired || this.getExpToNextLevel(hall.level);
       
@@ -161,22 +201,60 @@ export class GuildService {
       hall.upgradeApplicantId = null;
       hall.upgradeApplicant = undefined;
 
+      hall.upgradeRequests = mockUpgradeRequests
+        .filter(r => r.hallId === hall.id)
+        .map(r => ({
+          ...r,
+          applicant: getPlayerById(r.applicantId),
+          approver: r.approverId ? getPlayerById(r.approverId) : undefined,
+        }))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
       return {
         success: true,
         hall,
         message: `🎉 婚庆堂升级成功！当前等级：${hall.level}，豪华度加成：${(hall.luxuryBonus * 100).toFixed(0)}%，副本加成：${(hall.dungeonBonus * 100).toFixed(0)}%`,
       };
     } else {
+      if (pendingRequest) {
+        pendingRequest.status = 'rejected';
+        pendingRequest.approverId = playerId;
+        pendingRequest.approver = player;
+        pendingRequest.rejectedAt = new Date().toISOString();
+        pendingRequest.rejectReason = rejectReason;
+      }
+
       hall.pendingApproval = false;
       hall.pendingUpgrade = false;
       hall.upgradeApplicantId = null;
       hall.upgradeApplicant = undefined;
+
+      hall.upgradeRequests = mockUpgradeRequests
+        .filter(r => r.hallId === hall.id)
+        .map(r => ({
+          ...r,
+          applicant: getPlayerById(r.applicantId),
+          approver: r.approverId ? getPlayerById(r.approverId) : undefined,
+        }))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
       return {
         success: true,
         hall,
         message: '升级申请已被驳回。',
       };
     }
+  }
+
+  static getUpgradeRequests(hallId: string): UpgradeRequest[] {
+    return mockUpgradeRequests
+      .filter(r => r.hallId === hallId)
+      .map(r => ({
+        ...r,
+        applicant: getPlayerById(r.applicantId),
+        approver: r.approverId ? getPlayerById(r.approverId) : undefined,
+      }))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   static getContributionRanking(guildId: string, limit: number = 10): { playerId: string; playerName: string; playerAvatar: string; totalAmount: number; rank: number }[] {

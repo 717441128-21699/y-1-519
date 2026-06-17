@@ -242,4 +242,38 @@ router.get('/ongoing', (_req: Request, res: Response) => {
   }
 });
 
+router.get('/:weddingId/blessings', (req: Request, res: Response) => {
+  try {
+    const { weddingId } = req.params;
+    const messages = WeddingService.getBlessingMessages(weddingId);
+    res.json({
+      success: true,
+      data: messages,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error instanceof Error ? error.message : '获取祝福消息失败',
+    });
+  }
+});
+
+router.post('/:weddingId/mini-game', (req: Request, res: Response) => {
+  try {
+    const { weddingId } = req.params;
+    const { playerId, gameType } = req.body;
+    const result = WeddingService.playMiniGame(weddingId, playerId, gameType);
+    res.json({
+      success: result.success,
+      data: result,
+      message: result.message,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error instanceof Error ? error.message : '玩小游戏失败',
+    });
+  }
+});
+
 export default router;

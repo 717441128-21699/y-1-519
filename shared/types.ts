@@ -5,6 +5,7 @@ export type ProposalEventType = 'loveCalamity' | 'heavenlyBlessing' | null;
 export type DailyEventType = 'sweet' | 'coldWar' | null;
 export type GuildRole = 'president' | 'vicePresident' | 'member' | 'leader' | 'officer';
 export type RankingType = 'loveValue' | 'weddingCount' | 'guildContribution';
+export type UpgradeRequestStatus = 'pending' | 'approved' | 'rejected';
 
 export interface Player {
   id: string;
@@ -34,6 +35,8 @@ export interface ProposalCalculateRequest {
 
 export interface ProposalCalculateResponse {
   successRate: number;
+  intimacyFactor: number;
+  qualityBonus: number;
 }
 
 export interface ProposalRequest {
@@ -49,6 +52,11 @@ export interface ProposalResponse {
   randomEvent?: string;
   message: string;
   proposalId?: string;
+  baseRate: number;
+  eventBonus: number;
+  finalRate: number;
+  rollResult: number;
+  eventEffectMessage?: string;
 }
 
 export interface Proposal {
@@ -144,6 +152,7 @@ export interface Wedding {
   blessingPoints: number;
   totalGift: number;
   totalGifts?: number;
+  miniGames?: MiniGameResult[];
   createdAt: string;
 }
 
@@ -176,6 +185,22 @@ export interface ContributionRecord {
   createdAt: string;
 }
 
+export interface UpgradeRequest {
+  id: string;
+  hallId: string;
+  applicantId: string;
+  applicant?: Player;
+  fromLevel: number;
+  toLevel: number;
+  status: UpgradeRequestStatus;
+  createdAt: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  approverId?: string;
+  approver?: Player;
+  rejectReason?: string;
+}
+
 export interface GuildWeddingHall {
   id: string;
   guildId: string;
@@ -193,6 +218,7 @@ export interface GuildWeddingHall {
   upgradeApplicantId?: string | null;
   upgradeApplicant?: Player;
   myContribution?: number;
+  upgradeRequests?: UpgradeRequest[];
   contributions: ContributionRecord[];
   leaderName?: string;
 }
@@ -250,6 +276,17 @@ export interface RankingEntry {
   rankChange?: number;
 }
 
+export interface MiniGameResult {
+  id: string;
+  gameType: string;
+  playerId: string;
+  playerName: string;
+  playerAvatar: string;
+  score: number;
+  reward: number;
+  timestamp: string;
+}
+
 export interface BlessingMessage {
   id?: string;
   playerId: string;
@@ -258,6 +295,12 @@ export interface BlessingMessage {
   message: string;
   giftAmount: number;
   timestamp?: string;
+}
+
+export interface ReportFilter {
+  guildId?: string;
+  style?: WeddingStyle;
+  weekOffset?: number;
 }
 
 export interface ApiResponse<T = unknown> {

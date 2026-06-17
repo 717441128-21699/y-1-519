@@ -82,8 +82,8 @@ router.post('/hall/upgrade', (req: Request, res: Response) => {
 
 router.post('/hall/approve', (req: Request, res: Response) => {
   try {
-    const { playerId, approve } = req.body;
-    const result = GuildService.approveUpgrade(playerId, approve);
+    const { playerId, approve, rejectReason } = req.body;
+    const result = GuildService.approveUpgrade(playerId, approve, rejectReason);
     res.json({
       success: true,
       data: result,
@@ -92,6 +92,22 @@ router.post('/hall/approve', (req: Request, res: Response) => {
     res.status(400).json({
       success: false,
       message: error instanceof Error ? error.message : '审批失败',
+    });
+  }
+});
+
+router.get('/hall/:hallId/upgrade-requests', (req: Request, res: Response) => {
+  try {
+    const { hallId } = req.params;
+    const requests = GuildService.getUpgradeRequests(hallId);
+    res.json({
+      success: true,
+      data: requests,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error instanceof Error ? error.message : '获取升级申请记录失败',
     });
   }
 });

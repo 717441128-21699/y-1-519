@@ -29,7 +29,7 @@ const decorations: Decoration[] = [
 ];
 
 export default function WeddingPreparePage() {
-  const { currentPlayer, marriage, guildHall, loadMarriage, loadGuildHall } = useGameStore();
+  const { currentPlayer, marriage, guildHall, loadCurrentPlayer, loadMarriage, loadGuildHall } = useGameStore();
   const [selectedStyle, setSelectedStyle] = useState<WeddingStyle>('fairyTale');
   const [selectedDecorations, setSelectedDecorations] = useState<string[]>([]);
   const [luxuryScore, setLuxuryScore] = useState(0);
@@ -37,6 +37,10 @@ export default function WeddingPreparePage() {
   const [countdown, setCountdown] = useState(300);
   const [step, setStep] = useState<'style' | 'decorate' | 'confirm'>('style');
   const [createdWeddingId, setCreatedWeddingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadCurrentPlayer();
+  }, [loadCurrentPlayer]);
 
   useEffect(() => {
     if (currentPlayer) {

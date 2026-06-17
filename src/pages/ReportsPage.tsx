@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart3, Download, Calendar, TrendingUp, Heart, Sparkles, FileText, Coins } from 'lucide-react';
+import { BarChart3, Download, Calendar, TrendingUp, Heart, Sparkles, FileText, Coins, Filter } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import { MagicCard } from '../components/MagicCard';
 import { MagicButton } from '../components/MagicButton';
@@ -10,13 +10,21 @@ import html2pdf from 'html2pdf.js';
 import type { EChartsOption } from 'echarts';
 
 export default function ReportsPage() {
-  const { weeklyReport, loadWeeklyReport, loading } = useGameStore();
+  const { weeklyReport, loadWeeklyReport, loading, guilds, styles, loadGuilds, loadStyles } = useGameStore();
   const reportRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
+  const [guildId, setGuildId] = useState<string | undefined>(undefined);
+  const [style, setStyle] = useState<string | undefined>(undefined);
+  const [weekOffset, setWeekOffset] = useState<number>(0);
 
   useEffect(() => {
-    loadWeeklyReport();
-  }, [loadWeeklyReport]);
+    loadGuilds();
+    loadStyles();
+  }, [loadGuilds, loadStyles]);
+
+  useEffect(() => {
+    loadWeeklyReport({ guildId, style, weekOffset });
+  }, [guildId, style, weekOffset, loadWeeklyReport]);
 
   const handleExportPDF = async () => {
     if (!reportRef.current) return;
@@ -68,6 +76,12 @@ export default function ReportsPage() {
     oceanDream: { name: '海洋之梦', icon: '🌊' },
     forestWonder: { name: '森林奇幻', icon: '🌲' },
   };
+
+  const weekOptions = [
+    { value: 0, label: '本周' },
+    { value: -1, label: '上周' },
+    { value: -2, label: '两周前' },
+  ];
 
   const heatmapChartOption: EChartsOption = {
     tooltip: { trigger: 'item' },
@@ -205,6 +219,53 @@ export default function ReportsPage() {
             导出PDF
           </MagicButton>
         </div>
+
+        <MagicCard hover={false} className="mb-8 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Filter className="w-5 h-5 text-magic-purple" />
+            <h3 className="font-display text-lg font-bold">筛选条件</h3>
+          </div>
+          <div className="grid md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">公会</label>
+              <select
+                value={guildId || ''}
+                onChange={(e) => setGuildId(e.target.value || undefined)}
+                className="w-full bg-magic-darker border border-magic-purple/30 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-magic-purple transition-colors"
+              >
+                <option value="">全部公会</option>
+                {guilds.map((guild) => (
+                  <option key={guild.id} value={guild.id}>{guild.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">婚礼风格</label>
+              <select
+                value={style || ''}
+                onChange={(e) => setStyle(e.target.value || undefined)}
+                className="w-full bg-magic-darker border border-magic-purple/30 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-magic-purple transition-colors"
+              >
+                <option value="">全部风格</option>
+                {styles.map((s) => (
+                  <option key={s} value={s}>{styleNames[s]?.name || s}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">时间范围</label>
+              <select
+                value={weekOffset}
+                onChange={(e) => setWeekOffset(Number(e.target.value))}
+                className="w-full bg-magic-darker border border-magic-purple/30 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-magic-purple transition-colors"
+              >
+                {weekOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </MagicCard>
 
         <div ref={reportRef}>
           <div className="grid md:grid-cols-4 gap-4 mb-8">

@@ -23,7 +23,19 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 }
 
 export const apiClient = {
-  get: <T>(endpoint: string) => request<T>(endpoint, { method: 'GET' }),
+  get: <T>(endpoint: string, params?: Record<string, unknown>) => {
+    let url = endpoint;
+    if (params) {
+      const query = Object.entries(params)
+        .filter(([, value]) => value !== undefined && value !== null)
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+        .join('&');
+      if (query) {
+        url += `?${query}`;
+      }
+    }
+    return request<T>(url, { method: 'GET' });
+  },
   post: <T>(endpoint: string, body: unknown) =>
     request<T>(endpoint, { method: 'POST', body: JSON.stringify(body) }),
   put: <T>(endpoint: string, body: unknown) =>
@@ -85,6 +97,9 @@ export const weddingApi = {
   complete: (id: string) => apiClient.post(`/wedding/${id}/complete`, {}),
   getByMarriage: (marriageId: string) => apiClient.get(`/wedding/marriage/${marriageId}`),
   getOngoing: () => apiClient.get('/wedding/ongoing'),
+  getBlessings: (id: string) => apiClient.get(`/wedding/${id}/blessings`),
+  playMiniGame: (id: string, data: { playerId: string; gameType: string }) =>
+    apiClient.post(`/wedding/${id}/mini-game`, data),
 };
 
 export const guildApi = {
@@ -94,15 +109,20 @@ export const guildApi = {
     apiClient.post('/guild/hall/contribute', data),
   requestUpgrade: (data: { playerId: string }) =>
     apiClient.post('/guild/hall/upgrade', data),
-  approveUpgrade: (data: { playerId: string; approve: boolean }) =>
+  approveUpgrade: (data: { playerId: string; approve: boolean; rejectReason?: string }) =>
     apiClient.post('/guild/hall/approve', data),
+  getUpgradeRequests: (hallId: string) =>
+    apiClient.get(`/guild/hall/${hallId}/upgrade-requests`),
   getContributionRanking: (guildId: string, limit?: number) =>
     apiClient.get(`/guild/hall/${guildId}/ranking${limit ? `?limit=${limit}` : ''}`),
   getAllHalls: () => apiClient.get('/guild/halls/all'),
 };
 
 export const reportsApi = {
-  getWeekly: () => apiClient.get('/reports/weekly'),
+  getWeekly: (params?: { guildId?: string; style?: string; weekOffset?: number }) =>
+    apiClient.get('/reports/weekly', params),
+  getGuilds: () => apiClient.get('/reports/guilds'),
+  getStyles: () => apiClient.get('/reports/styles'),
   exportWeekly: (data: { report: unknown }) =>
     apiClient.post('/reports/weekly/export', data),
 };
