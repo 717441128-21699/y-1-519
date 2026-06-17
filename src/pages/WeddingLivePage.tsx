@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, MessageCircle, Coins, Users, Sparkles, Send, Crown, Music } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
@@ -8,18 +9,29 @@ import { PlayerAvatar } from '../components/PlayerAvatar';
 import type { BlessingMessage } from '../../shared/types';
 
 export default function WeddingLivePage() {
+  const { id } = useParams<{ id: string }>();
   const { currentPlayer, wedding, blessingMessages, loadWedding, sendBlessing, addBlessingMessage, blessing } = useGameStore();
   const [message, setMessage] = useState('');
   const [giftAmount, setGiftAmount] = useState(100);
   const [blessingPoints, setBlessingPoints] = useState(0);
   const [interactions, setInteractions] = useState(0);
+  const [totalGifts, setTotalGifts] = useState(0);
   const [weddingPhase, setWeddingPhase] = useState<'ceremony' | 'vows' | 'rings' | 'kiss' | 'celebration'>('ceremony');
   const [showFireworks, setShowFireworks] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    loadWedding('w1');
-  }, [loadWedding]);
+    if (id) {
+      loadWedding(id);
+    }
+  }, [loadWedding, id]);
+
+  useEffect(() => {
+    if (wedding) {
+      setBlessingPoints(wedding.blessingPoints || 0);
+      setTotalGifts(wedding.totalGifts || wedding.totalGift || 0);
+    }
+  }, [wedding]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -57,6 +69,20 @@ export default function WeddingLivePage() {
     const success = await sendBlessing(wedding.id, currentPlayer.id, message, giftAmount);
     if (success) {
       setMessage('');
+      setBlessingPoints((prev) => prev + 10 + Math.floor(giftAmount / 10));
+      setInteractions((prev) => prev + 1);
+      setTotalGifts((prev) => prev + giftAmount);
+      
+      const newBlessing: BlessingMessage = {
+        id: Date.now().toString(),
+        playerId: currentPlayer.id,
+        playerName: currentPlayer.name,
+        playerAvatar: currentPlayer.avatar,
+        message,
+        giftAmount,
+        timestamp: new Date().toISOString(),
+      };
+      addBlessingMessage(newBlessing);
     }
   };
 
@@ -210,7 +236,7 @@ export default function WeddingLivePage() {
               </MagicCard>
               <MagicCard hover={false} className="text-center p-4">
                 <div className="text-3xl mb-2">💰</div>
-                <p className="text-2xl font-bold text-magic-pink">{wedding?.totalGifts?.toLocaleString() || '0'}</p>
+                <p className="text-2xl font-bold text-magic-pink">{totalGifts.toLocaleString()}</p>
                 <p className="text-sm text-gray-400">礼金总额</p>
               </MagicCard>
             </div>

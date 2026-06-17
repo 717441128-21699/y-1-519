@@ -50,8 +50,10 @@ export class GuildService {
       return { success: false, message: '贡献数量必须大于0！' };
     }
 
-    hall.exp += amount;
+    hall.exp = (hall.exp || 0) + amount;
+    hall.currentContribution = (hall.currentContribution || 0) + amount;
     hall.pendingApproval = false;
+    hall.pendingUpgrade = false;
     hall.upgradeApplicantId = null;
 
     const record: ContributionRecord = {
@@ -64,20 +66,29 @@ export class GuildService {
     };
     hall.contributions.unshift(record);
 
-    if (hall.exp >= hall.expToNext) {
+    if (hall.myContribution !== undefined) {
+      hall.myContribution += amount;
+    }
+
+    const expToNext = hall.expToNext || this.getExpToNextLevel(hall.level);
+    const upgradeRequired = hall.upgradeRequired || this.getExpToNextLevel(hall.level);
+
+    if (hall.currentContribution >= upgradeRequired || hall.exp >= expToNext) {
       hall.pendingApproval = true;
+      hall.pendingUpgrade = true;
       hall.upgradeApplicantId = playerId;
+      hall.upgradeApplicant = player;
       return {
         success: true,
         hall,
-        message: `🎉 贡献成功！婚庆堂经验已满足升级条件，请等待会长审批！`,
+        message: `🎉 贡献成功！婚庆堂已满足升级条件，请等待会长/副会长审批！`,
       };
     }
 
     return {
       success: true,
       hall,
-      message: `贡献成功！获得 ${amount} 贡献值！当前进度：${hall.exp}/${hall.expToNext}`,
+      message: `贡献成功！获得 ${amount} 贡献值！当前进度：${hall.currentContribution}/${hall.upgradeRequired}`,
     };
   }
 
@@ -120,7 +131,8 @@ export class GuildService {
       return { success: false, message: '您还没有加入公会！' };
     }
 
-    if (player.guildRole !== 'president' && player.guildRole !== 'vicePresident') {
+    if (player.guildRole !== 'president' && player.guildRole !== 'vicePresident' &&
+        player.guildRole !== 'leader' && player.guildRole !== 'officer') {
       return { success: false, message: '只有会长或副会长才能审批！' };
     }
 
@@ -129,18 +141,25 @@ export class GuildService {
       return { success: false, message: '公会婚庆堂不存在！' };
     }
 
-    if (!hall.pendingApproval) {
+    if (!hall.pendingApproval && !hall.pendingUpgrade) {
       return { success: false, message: '没有待审批的升级申请！' };
     }
 
     if (approve) {
+      const oldExpToNext = hall.expToNext || this.getExpToNextLevel(hall.level);
+      const oldUpgradeRequired = hall.upgradeRequired || this.getExpToNextLevel(hall.level);
+      
       hall.level++;
-      hall.exp = hall.exp - hall.expToNext;
+      hall.exp = (hall.exp || 0) - oldExpToNext;
+      hall.currentContribution = (hall.currentContribution || 0) - oldUpgradeRequired;
       hall.expToNext = this.getExpToNextLevel(hall.level);
+      hall.upgradeRequired = this.getExpToNextLevel(hall.level);
       hall.luxuryBonus = this.getLuxuryBonus(hall.level);
       hall.dungeonBonus = this.getDungeonBonus(hall.level);
       hall.pendingApproval = false;
+      hall.pendingUpgrade = false;
       hall.upgradeApplicantId = null;
+      hall.upgradeApplicant = undefined;
 
       return {
         success: true,
@@ -149,7 +168,9 @@ export class GuildService {
       };
     } else {
       hall.pendingApproval = false;
+      hall.pendingUpgrade = false;
       hall.upgradeApplicantId = null;
+      hall.upgradeApplicant = undefined;
       return {
         success: true,
         hall,

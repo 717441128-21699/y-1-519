@@ -63,6 +63,59 @@ export class WeddingService {
     return { success: true, wedding, message: '婚礼筹备已创建！' };
   }
 
+  static createCompleteWedding(
+    marriageId: string,
+    style: WeddingStyle,
+    decorationIds: string[],
+    startTime: string,
+    luxuryScore: number,
+    estimatedGift: number
+  ): { success: boolean; wedding?: Wedding; message: string } {
+    const marriage = getMarriageById(marriageId);
+    if (!marriage) {
+      return { success: false, message: '婚姻关系不存在！' };
+    }
+
+    const player1 = getPlayerById(marriage.player1Id);
+    const player2 = getPlayerById(marriage.player2Id);
+
+    const decorations: Decoration[] = decorationIds.map(id => {
+      const item = mockItems.find(i => i.id === id);
+      return {
+        id,
+        itemId: id,
+        itemName: item?.name || '未知装饰',
+        luxuryBonus: item?.luxuryBonus || 10,
+      };
+    });
+
+    const wedding: Wedding = {
+      id: generateId(),
+      marriageId,
+      marriage,
+      partner1: player1,
+      partner2: player2,
+      partner1Name: player1?.name || '',
+      partner2Name: player2?.name || '',
+      style,
+      decorations,
+      luxuryScore,
+      startTime,
+      status: 'preparing',
+      guests: [],
+      guestCount: 0,
+      blessingPoints: 0,
+      totalGift: estimatedGift,
+      totalGifts: 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    mockWeddings.push(wedding);
+    marriage.weddingCount++;
+
+    return { success: true, wedding, message: '婚礼已创建！' };
+  }
+
   static addDecoration(weddingId: string, itemId: string, positionX: number, positionY: number): { success: boolean; decoration?: Decoration; message: string } {
     const wedding = mockWeddings.find(w => w.id === weddingId);
     if (!wedding) {
@@ -148,18 +201,13 @@ export class WeddingService {
       return { success: false, message: '婚礼不存在！' };
     }
 
-    if (wedding.status !== 'ongoing') {
+    if (wedding.status === 'completed') {
       return { success: false, message: '婚礼已结束！' };
     }
 
     const player = getPlayerById(playerId);
     if (!player) {
       return { success: false, message: '玩家不存在！' };
-    }
-
-    const existingGuest = wedding.guests.find(g => g.playerId === playerId);
-    if (existingGuest) {
-      return { success: false, message: '您已送过祝福！' };
     }
 
     const guest: Guest = {
@@ -170,10 +218,12 @@ export class WeddingService {
       blessedAt: new Date().toISOString(),
     };
     wedding.guests.push(guest);
+    wedding.guestCount = (wedding.guestCount || 0) + 1;
 
     const blessingPoints = Math.floor(giftAmount / 10) + message.length;
     wedding.blessingPoints += blessingPoints;
     wedding.totalGift += giftAmount;
+    wedding.totalGifts = (wedding.totalGifts || 0) + giftAmount;
 
     const blessing: BlessingMessage = {
       id: generateId(),

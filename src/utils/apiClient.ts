@@ -41,7 +41,7 @@ export const dataApi = {
 };
 
 export const proposalApi = {
-  calculate: (data: { intimacy: number; qualityBonus: number }) =>
+  calculate: (data: { proposerId: string; targetId: string; tokenItemId: string }) =>
     apiClient.post('/proposal/calculate', data),
   submit: (data: { proposerId: string; targetId: string; tokenItemId: string }) =>
     apiClient.post('/proposal/submit', data),
@@ -71,6 +71,14 @@ export const weddingApi = {
   getLuxury: (id: string) => apiClient.get(`/wedding/${id}/calculate-luxury`),
   calculateLuxury: (data: { style: string; decorations: string[] }) =>
     apiClient.post('/wedding/calculate-luxury', data),
+  createWedding: (data: {
+    marriageId: string;
+    style: string;
+    decorations: string[];
+    startTime: string;
+    luxuryScore: number;
+    estimatedGift: number;
+  }) => apiClient.post('/wedding/create', data),
   start: (id: string) => apiClient.post(`/wedding/${id}/start`, {}),
   sendBlessing: (id: string, data: { playerId: string; message: string; giftAmount: number }) =>
     apiClient.post(`/wedding/${id}/blessing`, data),

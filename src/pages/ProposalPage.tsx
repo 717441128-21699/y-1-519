@@ -16,8 +16,9 @@ export default function ProposalPage() {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [successRate, setSuccessRate] = useState<number | null>(null);
   const [intimacy, setIntimacy] = useState<number>(0);
+  const [qualityBonus, setQualityBonus] = useState<number>(0);
   const [showResult, setShowResult] = useState(false);
-  const [result, setResult] = useState<{ success: boolean; message: string; randomEvent?: string } | null>(null);
+  const [result, setResult] = useState<{ success: boolean; message: string; randomEvent?: string; successRate?: number } | null>(null);
 
   useEffect(() => {
     loadPlayers();
@@ -25,21 +26,29 @@ export default function ProposalPage() {
   }, [loadPlayers, loadItems]);
 
   useEffect(() => {
-    if (selectedTarget && currentPlayer) {
-      const intimacyValue = Math.floor(Math.random() * 80) + 20;
-      setIntimacy(intimacyValue);
-      
-      if (selectedItem) {
-        calculateSuccessRate(intimacyValue, selectedItem.qualityBonus);
-      }
+    if (selectedTarget && selectedItem && currentPlayer) {
+      calculateSuccessRate();
+    } else {
+      setSuccessRate(null);
+      setIntimacy(0);
+      setQualityBonus(0);
     }
   }, [selectedTarget, selectedItem, currentPlayer]);
 
-  const calculateSuccessRate = async (intimacyVal: number, qualityBonus: number) => {
+  const calculateSuccessRate = async () => {
+    if (!currentPlayer || !selectedTarget || !selectedItem) return;
+    
     try {
-      const response = await proposalApi.calculate({ intimacy: intimacyVal, qualityBonus });
+      const response = await proposalApi.calculate({
+        proposerId: currentPlayer.id,
+        targetId: selectedTarget.id,
+        tokenItemId: selectedItem.id,
+      });
       if (response.success) {
-        setSuccessRate((response.data as { successRate: number }).successRate);
+        const data = response.data as { successRate: number; intimacy: number; qualityBonus: number };
+        setSuccessRate(data.successRate);
+        setIntimacy(data.intimacy);
+        setQualityBonus(data.qualityBonus);
       }
     } catch (error) {
       console.error('计算成功率失败', error);
@@ -60,6 +69,13 @@ export default function ProposalPage() {
     if (response) {
       setResult(response);
       setShowResult(true);
+    }
+  };
+
+  const handleResultClose = () => {
+    setShowResult(false);
+    if (result?.success) {
+      window.location.href = '/marriage';
     }
   };
 
@@ -147,7 +163,7 @@ export default function ProposalPage() {
                 <div className="text-center">
                   <p className="text-sm text-gray-400 mb-2">道具加成</p>
                   <div className="text-3xl font-bold text-magic-gold">
-                    {selectedItem ? `+${selectedItem.qualityBonus}%` : '--'}
+                    {qualityBonus > 0 ? `+${qualityBonus}%` : '--'}
                   </div>
                   {selectedItem && (
                     <p className="text-sm text-gray-400">{selectedItem.name}</p>
@@ -211,7 +227,7 @@ export default function ProposalPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-              onClick={() => setShowResult(false)}
+              onClick={handleResultClose}
             >
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
@@ -248,6 +264,19 @@ export default function ProposalPage() {
                   }`}>
                     {result.success ? '求婚成功！' : '求婚失败...'}
                   </h2>
+                  
+                  {result.successRate !== undefined && (
+                    <div className="mb-4 p-3 bg-magic-darker/50 rounded-lg">
+                      <p className="text-sm text-gray-400">实际成功率</p>
+                      <p className={`text-2xl font-bold ${
+                        result.successRate >= 70 ? 'text-green-400' :
+                        result.successRate >= 40 ? 'text-yellow-400' : 'text-red-400'
+                      }`}>
+                        {result.successRate}%
+                      </p>
+                    </div>
+                  )}
+                  
                   <p className="text-gray-300 mb-6">{result.message}</p>
                   
                   {result.success && selectedTarget && (
@@ -256,7 +285,7 @@ export default function ProposalPage() {
                     </p>
                   )}
 
-                  <MagicButton onClick={() => setShowResult(false)}>
+                  <MagicButton onClick={handleResultClose}>
                     {result.success ? '前往婚姻页面' : '再试一次'}
                   </MagicButton>
                 </MagicCard>

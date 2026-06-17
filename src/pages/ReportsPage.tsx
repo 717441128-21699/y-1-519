@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart3, Download, Calendar, TrendingUp, Heart, Sparkles, FileText } from 'lucide-react';
+import { BarChart3, Download, Calendar, TrendingUp, Heart, Sparkles, FileText, Coins } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import { MagicCard } from '../components/MagicCard';
 import { MagicButton } from '../components/MagicButton';
@@ -40,6 +40,7 @@ export default function ReportsPage() {
 
   const heatmapData = weeklyReport?.report?.weddingStyleHeatmap || {};
   const loveTrendData = weeklyReport?.report?.loveValueTrend || [];
+  const transactionTrendData = weeklyReport?.report?.transactionTrend || [];
   const radarData = (weeklyReport?.report?.radarData || {}) as {
     proposalSuccess: number;
     marriageHappiness: number;
@@ -153,6 +154,34 @@ export default function ReportsPage() {
     backgroundColor: 'transparent',
   };
 
+  const transactionChartOption: EChartsOption = {
+    tooltip: { trigger: 'axis' },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: transactionTrendData.map(d => d.date),
+      axisLabel: { color: '#9CA3AF' }
+    },
+    yAxis: { type: 'value', axisLabel: { color: '#9CA3AF' } },
+    series: [{
+      type: 'line',
+      data: transactionTrendData.map(d => d.amount),
+      smooth: true,
+      areaStyle: {
+        color: {
+          type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(245, 158, 11, 0.3)' },
+            { offset: 1, color: 'rgba(107, 70, 193, 0.05)' },
+          ],
+        },
+      },
+      lineStyle: { color: '#F59E0B', width: 3 },
+      itemStyle: { color: '#EC4899' },
+    }],
+    backgroundColor: 'transparent',
+  };
+
   return (
     <div className="min-h-screen pt-20 pb-12">
       <div className="container mx-auto px-4 max-w-6xl">
@@ -223,18 +252,30 @@ export default function ReportsPage() {
             </MagicCard>
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-6 mb-8">
+          <div className="grid lg:grid-cols-2 gap-6 mb-8">
             <MagicCard hover={false}>
               <h3 className="font-display text-lg font-bold mb-4 flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-magic-purple" />
+                <Coins className="w-5 h-5 text-magic-gold" />
+                交易走势
+              </h3>
+              <div className="h-64">
+                <ReactECharts option={transactionChartOption} style={{ height: '100%' }} />
+              </div>
+            </MagicCard>
+
+            <MagicCard hover={false}>
+              <h3 className="font-display text-lg font-bold mb-4 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-magic-purple" />
                 综合雷达图
               </h3>
               <div className="h-64">
                 <ReactECharts option={radarChartOption} style={{ height: '100%' }} />
               </div>
             </MagicCard>
+          </div>
 
-            <MagicCard hover={false} className="lg:col-span-2">
+          <div className="mb-8">
+            <MagicCard hover={false}>
               <h3 className="font-display text-lg font-bold mb-4 flex items-center gap-2">
                 <FileText className="w-5 h-5 text-magic-blue" />
                 数据洞察

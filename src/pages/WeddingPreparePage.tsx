@@ -36,6 +36,7 @@ export default function WeddingPreparePage() {
   const [estimatedGift, setEstimatedGift] = useState(0);
   const [countdown, setCountdown] = useState(300);
   const [step, setStep] = useState<'style' | 'decorate' | 'confirm'>('style');
+  const [createdWeddingId, setCreatedWeddingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentPlayer) {
@@ -77,18 +78,39 @@ export default function WeddingPreparePage() {
     return sum + (deco?.cost || 0);
   }, 0);
 
-  const startWedding = () => {
-    setStep('confirm');
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          window.location.href = '/wedding/live/w1';
-          return 0;
-        }
-        return prev - 1;
+  const startWedding = async () => {
+    if (!marriage) return;
+
+    try {
+      const startTime = new Date(Date.now() + countdown * 1000).toISOString();
+      const response = await weddingApi.createWedding({
+        marriageId: marriage.id,
+        style: selectedStyle,
+        decorations: selectedDecorations,
+        startTime,
+        luxuryScore,
+        estimatedGift,
       });
-    }, 1000);
+
+      if (response.success && response.data) {
+        const wedding = response.data as { id: string };
+        setCreatedWeddingId(wedding.id);
+        setStep('confirm');
+
+        const timer = setInterval(() => {
+          setCountdown((prev) => {
+            if (prev <= 1) {
+              clearInterval(timer);
+              window.location.href = `/wedding/live/${wedding.id}`;
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('创建婚礼失败', error);
+    }
   };
 
   const formatTime = (seconds: number) => {

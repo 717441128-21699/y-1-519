@@ -34,6 +34,37 @@ router.post('/calculate-luxury', (req: Request, res: Response) => {
   }
 });
 
+router.post('/create', (req: Request, res: Response) => {
+  try {
+    const { marriageId, style, decorations, startTime, luxuryScore, estimatedGift } = req.body;
+    const result = WeddingService.createCompleteWedding(
+      marriageId,
+      style as WeddingStyle,
+      decorations || [],
+      startTime,
+      luxuryScore,
+      estimatedGift
+    );
+    if (!result.success) {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+      return;
+    }
+    res.json({
+      success: true,
+      data: result.wedding,
+      message: result.message,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error instanceof Error ? error.message : '创建婚礼失败',
+    });
+  }
+});
+
 router.post('/prepare', (req: Request, res: Response) => {
   try {
     const { marriageId, style, startTime } = req.body;
